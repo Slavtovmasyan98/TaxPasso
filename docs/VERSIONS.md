@@ -71,3 +71,13 @@ git checkout main          # вернуться к актуальной
 - 27 сценариев безопасности пройдены на реальной базе (с откатом тестовых данных): роли, RLS, оплата, согласие, владельцы, ручная проверка, ITIN.
 - Откат 003 → 002 проверен в транзакции: база возвращается к состоянию 001.
 - Хранилище файлов (Storage) через API ещё не проверено — после деплоя загрузите тестовый файл.
+
+## Vercel (с версии v5)
+
+- Проект: `taxpasso` (prj_T41Ef7U3umv83ue5dzh7KcDSnT2n), команда taxpasso.
+- Основной адрес: https://taxpasso-taxpasso.vercel.app
+- Первый деплой сделан напрямую через Vercel API из версии `v4-supabase` (сборка прошла, статус READY).
+- Переменные окружения заданы в проекте: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (publishable key).
+- Защита Vercel Authentication — только для preview-версий; production открыт.
+- Установка зависимостей: `npm install` (package-lock.json в деплой не передавался).
+- TODO: подключить GitHub-репозиторий в Vercel → Settings → Git, чтобы каждый push публиковался автоматически.
