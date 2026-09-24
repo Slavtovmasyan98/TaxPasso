@@ -31,3 +31,24 @@ Use a disposable Supabase project, never real identity documents. Create client 
 | Google Auth with unauthorized redirect                                      | Rejected by Auth configuration         |
 
 Test bundle payment approval on the server when implementing Checkout. No active payment endpoint exists in this MVP.
+
+## Шаг 1 (миграция 002)
+
+| Scenario | Expected |
+| --- | --- |
+| A updates own orders.payment_status / paid_at / amount_cents | Permission denied |
+| A or partner P calls mark_order_paid | Permission denied (service_role only) |
+| P advances an unpaid order | "Payment required" |
+| A calls record_consent on B's order | "Not permitted" |
+| A calls record_consent on own draft | One consent row, readable by A and P |
+| A inserts/edits members and company on own draft/application order | Succeeds |
+| A edits members after status moved to review | No rows updated / RLS error |
+| B inserts a member into A's order | RLS error |
+| Two members with is_responsible = true in one order | Unique violation |
+| A inserts document with member_id from another order | "Member does not belong to this order" |
+| Member with citizenship RU or applicant.country "Russia" | order_reviews row created |
+| A selects order_reviews | No rows |
+| P selects order_reviews for assigned order | Row visible |
+| A reads taxpasso_private.review_countries via API | Not exposed |
+| order_payment_ready without consent / unresolved review / unapproved ITIN | false |
+| Rollback 002_foundation_down.sql on a copy of the DB | Schema equals state after 001 |
