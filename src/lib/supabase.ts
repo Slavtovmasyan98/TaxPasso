@@ -1,8 +1,26 @@
 import { createClient } from "@supabase/supabase-js";
-const url = import.meta.env.VITE_SUPABASE_URL;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
-export const supabase = url && key ? createClient(url, key) : null;
-export const demoMode = !supabase;
+import {
+  DEMO_MODE,
+  CONFIG_ERROR,
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  LEGAL_VERSIONS,
+} from "./config";
+export const supabase =
+  DEMO_MODE || CONFIG_ERROR
+    ? null
+    : createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const demoMode = DEMO_MODE;
+export type DocumentKind =
+  | "passport"
+  | "selfie"
+  | "tax_return"
+  | "exception_evidence"
+  | "llc_agreement"
+  | "articles"
+  | "ein_letter"
+  | "itin_letter"
+  | "other";
 export type Order = {
   id: string;
   product: string;
@@ -18,7 +36,12 @@ export type Order = {
     expected_by: string | null;
   }[];
 };
-export async function uploadDocument(orderId: string, file: File) {
+export async function uploadDocument(
+  orderId: string,
+  file: File,
+  kind: DocumentKind = "other",
+  memberId?: string,
+) {
   if (!supabase) throw Error("Demo");
   if (
     file.size > 10 * 1024 * 1024 ||
@@ -43,6 +66,8 @@ export async function uploadDocument(orderId: string, file: File) {
       name: file.name,
       mime_type: file.type,
       size_bytes: file.size,
+      kind,
+      ...(memberId ? { member_id: memberId } : {}),
     });
   if (dbError) {
     await supabase.storage.from("documents").remove([path]);
@@ -56,4 +81,16 @@ export async function documentUrl(path: string) {
     .createSignedUrl(path, 60);
   if (error) throw error;
   return data.signedUrl;
+}
+
+// Сохраняет согласие клиента с текущими версиями Terms и Refund Policy.
+export async function recordConsent(orderId: string) {
+  if (!supabase) throw Error("Demo");
+  const { error } = await supabase.rpc("record_consent", {
+    p_order: orderId,
+    p_terms_version: LEGAL_VERSIONS.terms,
+    p_refund_version: LEGAL_VERSIONS.refund,
+    p_user_agent: navigator.userAgent.slice(0, 500),
+  });
+  if (error) throw error;
 }

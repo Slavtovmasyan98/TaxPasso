@@ -1,8 +1,14 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams, useOutletContext } from "react-router-dom";
 import { Check, ArrowRight, Upload, LockKeyhole } from "lucide-react";
 import { useI18n } from "../i18n";
-import { supabase, demoMode, uploadDocument } from "../lib/supabase";
+import {
+  supabase,
+  demoMode,
+  uploadDocument,
+  recordConsent,
+} from "../lib/supabase";
+import { countryList } from "../lib/countries";
 import { useAuth } from "../lib/auth";
 import { products } from "./Pricing";
 import { Button } from "../components/ui/button";
@@ -31,6 +37,7 @@ export function Onboarding() {
   const itin = product.startsWith("itin");
   const needsGate = itin || product.startsWith("bundle");
   const [submitted, setSubmitted] = useState(false);
+  const countries = useMemo(() => countryList(lang), [lang]);
   async function next() {
     setMessage("");
     if (step === 0) {
@@ -90,7 +97,7 @@ export function Onboarding() {
     if (!file || demoMode) return;
     setBusy(true);
     try {
-      await uploadDocument(id, file);
+      await uploadDocument(id, file, "passport");
       setFiles((a) => [...a, file.name]);
       setMessage(t.saved);
     } catch {
@@ -105,13 +112,18 @@ export function Onboarding() {
       return;
     }
     setBusy(true);
-    const { error } = await supabase!.rpc("submit_order", { p_order: id });
-    if (error) setMessage(t.error);
-    else {
+    try {
+      // Согласие сохраняется в базе вместе с версией условий — до отправки заявки.
+      await recordConsent(id);
+      const { error } = await supabase!.rpc("submit_order", { p_order: id });
+      if (error) throw error;
       setSubmitted(true);
       refresh();
+    } catch {
+      setMessage(t.error);
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }
   return (
     <section className="panel wizard">
@@ -160,12 +172,27 @@ export function Onboarding() {
                 }[k]
               }{" "}
               *
-              <input
-                required
-                maxLength={k === "activity" ? 1000 : 160}
-                value={form[k]}
-                onChange={(e) => setForm({ ...form, [k]: e.target.value })}
-              />
+              {k === "country" ? (
+                <select
+                  required
+                  value={form.country}
+                  onChange={(e) => setForm({ ...form, country: e.target.value })}
+                >
+                  <option value="">—</option>
+                  {countries.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  required
+                  maxLength={k === "activity" ? 1000 : 160}
+                  value={form[k]}
+                  onChange={(e) => setForm({ ...form, [k]: e.target.value })}
+                />
+              )}
             </label>
           ))}
           <label className="checkbox wide">

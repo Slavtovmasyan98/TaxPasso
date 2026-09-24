@@ -17,6 +17,7 @@ import { LLC, ITIN, FAQ, Legal } from "./pages/Services";
 import { Login } from "./pages/Auth";
 import { AppLayout, Dashboard, Documents, Deadlines } from "./pages/Dashboard";
 import { Onboarding } from "./pages/Onboarding";
+import { CONFIG_ERROR } from "./lib/config";
 function NotFound() {
   const { t } = useI18n();
   return (
@@ -26,7 +27,28 @@ function NotFound() {
     </div>
   );
 }
+// Сайт без ключей Supabase и без явного демо-режима не должен принимать заявки.
+function ConfigError() {
+  return (
+    <div className="container page">
+      <h1>Сайт временно недоступен / Site temporarily unavailable</h1>
+      <p>
+        Идут технические работы. Пожалуйста, зайдите позже.
+        <br />
+        Maintenance in progress. Please come back later.
+      </p>
+    </div>
+  );
+}
+if (CONFIG_ERROR) {
+  console.error(
+    "Taxpasso: VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY не заданы, а VITE_DEMO_MODE не равен true.",
+  );
+}
 ReactDOM.createRoot(document.getElementById("root")!).render(
+  CONFIG_ERROR ? (
+    <ConfigError />
+  ) : (
   <React.StrictMode>
     <I18n>
       <AuthProvider>
@@ -54,5 +76,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         </BrowserRouter>
       </AuthProvider>
     </I18n>
-  </React.StrictMode>,
+  </React.StrictMode>
+  ),
 );

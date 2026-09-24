@@ -52,3 +52,18 @@ Test bundle payment approval on the server when implementing Checkout. No active
 | A reads taxpasso_private.review_countries via API | Not exposed |
 | order_payment_ready without consent / unresolved review / unapproved ITIN | false |
 | Rollback 002_foundation_down.sql on a copy of the DB | Schema equals state after 001 |
+
+## Шаг 2 (миграция 003)
+
+| Scenario | Expected |
+| --- | --- |
+| A inserts order with applicant larger than 16 KB | Check violation applicant_size |
+| A inserts applicant with nested object or number value | Check violation applicant_flat |
+| A inserts normal applicant (string values) | Succeeds |
+| A calls reject_eligibility | Not permitted |
+| P rejects assigned unpaid ITIN order with empty reason | "Reason required" |
+| P rejects assigned unpaid ITIN order with reason | eligibility = rejected, note, decided_by/at set |
+| P rejects a paid order | Error, nothing changed |
+| Build without Supabase keys and without VITE_DEMO_MODE=true | Maintenance screen, no forms |
+| Submit application in UI | order_consents row with current LEGAL_VERSIONS, then status = application |
+| Upload in onboarding | documents.kind = passport |
