@@ -122,7 +122,7 @@ const en: typeof ru = {
   quizQuestions: [
     "Are you eligible for an SSN?",
     "Do you have a prepared tax return or a confirmed IRS exception?",
-    "Are you a member of a multi-member LLC?",
+    "Are you a member of a multi-owner LLC?",
     "Country of residence",
   ],
   yes: "Yes",
@@ -185,7 +185,7 @@ const en: typeof ru = {
   activity: "Business description",
   save: "Save application",
   saved: "Application saved",
-  payment: "Pay with Stripe Checkout",
+  payment: "Payment coming soon",
   paymentNote: "Payments are not connected yet. You will not be charged.",
   itinGate:
     "ITIN and bundles containing ITIN require partner approval of your tax basis before payment.",
