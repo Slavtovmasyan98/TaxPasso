@@ -1,8 +1,8 @@
 @import "tailwindcss";
 :root {
   font-family: Inter, Arial, sans-serif;
-  color: #182e2b;
-  background: #fff;
+  color: var(--ink);
+  background: var(--bg);
   font-synthesis: none;
   font-weight: 400;
   --bg: #fff;
@@ -23,6 +23,8 @@ html {
 }
 body {
   margin: 0;
+  color: var(--ink);
+  background: var(--bg);
   font-size: 16px;
   line-height: 1.6;
 }
@@ -1300,6 +1302,7 @@ details[open] summary svg {
   margin-top: 20px;
 }
 .dark {
+  color-scheme: dark;
   --bg: #101d19;
   --surface: #172720;
   --ink: #e2eee7;
