@@ -143,6 +143,7 @@ export function AppLayout() {
     </div>
   );
 }
+function operationMessage(error: { message?: string } | null, lang: string, fallback: string) { if (!error) return fallback; if (error.message === "Payment required") return lang === "ru" ? "Сначала нужна оплата" : "Payment required first"; if (error.message === "Eligibility approval required") return lang === "ru" ? "Сначала подтвердите основание ITIN" : "Approve ITIN eligibility first"; return fallback; }
 function InfoIcon() {
   return <LockKeyhole size={16} />;
 }
@@ -281,7 +282,7 @@ export function Dashboard() {
             )}
             {["partner", "admin"].includes(role) && (
               <div className="button-row">
-                {role === "admin" && o.payment_status !== "paid" && <Button variant="outline" onClick={async () => { const note = window.prompt(lang === "ru" ? "Комментарий к ручной оплате (необязательно)" : "Manual payment note (optional)") || null; const { error } = await supabase!.rpc("mark_order_paid_manually", { p_order: o.id, p_note: note }); setMsg(error ? t.error : t.saved); refresh(); }}>{lang === "ru" ? "Отметить оплату" : "Mark paid"}</Button>}
+                {role === "admin" && o.payment_status !== "paid" && <Button variant="outline" onClick={async () => { const note = window.prompt(lang === "ru" ? "Комментарий к ручной оплате (необязательно)" : "Manual payment note (optional)") || null; const { error } = await supabase!.rpc("mark_order_paid_manually", { p_order: o.id, p_note: note }); setMsg(operationMessage(error, lang, t.error)); refresh(); }}>{lang === "ru" ? "Отметить оплату" : "Mark paid"}</Button>}
                 <Button onClick={() => advance(o)}>
                   {t.next} · {o.product.startsWith("itin") ? "ITIN" : "LLC"}
                 </Button>
@@ -416,6 +417,7 @@ export function Documents() {
           type="file"
           accept="application/pdf,image/jpeg,image/png"
           disabled={demoMode || !orderId || busy}
+          id="document-upload"
           onChange={(e) => {
             upload(e.target.files?.[0]);
             e.target.value = "";
@@ -453,6 +455,7 @@ export function Documents() {
               {t.download}
               <ArrowUpRight size={16} />
             </Button></div>
+            {d.review_status === "rejected" && <Button variant="outline" onClick={() => { setOrderId(d.order_id); document.getElementById("document-upload")?.click(); }}>{lang === "ru" ? "Загрузить заново" : "Upload again"}</Button>}
             <span className="fineprint">{d.review_status === "accepted" ? (lang === "ru" ? "Принят" : "Accepted") : d.review_status === "rejected" ? (lang === "ru" ? "Отклонён" : "Rejected") : (lang === "ru" ? "На проверке" : "Under review")}{d.review_comment ? ` · ${d.review_comment}` : ""}</span>
           </div>
         ))
