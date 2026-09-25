@@ -134,7 +134,9 @@ export function Calculator() {
   const [tax, setTax] = useState(false);
   const [mail, setMail] = useState(false);
   const p = products.find((p) => p.id === id)!;
-  const state = p.state * years;
+  // Платёж штату впервые наступает на второй год: пошлина за регистрацию уже в цене пакета,
+  // годовой отчёт WY — в месяц регистрации следующего года, налог DE — до 1 июня следующего года.
+  const state = p.state * (years - 1);
   const renewal = p.renew * (years - 1);
   const extras = (tax ? 349 * years : 0) + (mail ? 99 * years : 0);
   return (
@@ -174,7 +176,10 @@ export function Calculator() {
             checked={tax}
             onChange={(e) => setTax(e.target.checked)}
           />
-          Form 5472 + 1120 · $349/{t.year}
+          Form 5472 + 1120 · $349/{t.year}{" "}
+          <span className="muted">
+            ({lang === "ru" ? "для LLC с одним владельцем" : "single-member LLC"})
+          </span>
         </label>
         <label className="checkbox">
           <input

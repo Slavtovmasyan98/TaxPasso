@@ -76,7 +76,7 @@ const en: typeof ru = {
   serviceRenew: "Service / RA renewals",
   total: "Planned budget",
   calcNote:
-    "Conservative estimate: one annual state obligation per ownership year; payment may fall in the following calendar year. WY starts at $60 and depends on in-state assets. Income taxes, document shipping and other individual expenses are excluded.",
+    "The state formation fee is included in the package. The first annual state payment is due in year two: WY annual report in your formation month (from $60, depends on in-state assets), DE $400 tax by June 1. Income taxes, document shipping and other individual expenses are excluded.",
   compare: "Choose with the full picture.",
   compareSub: "Compare what is included, not just the starting price.",
   provider: "Provider",
