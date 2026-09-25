@@ -6,13 +6,15 @@
   font-synthesis: none;
   font-weight: 400;
   --bg: #fff;
-  --surface: #f5f8f7;
-  --ink: #182e2b;
-  --muted: #697b77;
-  --line: #dee7e3;
-  --accent: #087b60;
-  --tint: #eaf5ef;
-  --deep: #073e31;
+  --surface: #f6f8fb;
+  --ink: #0f1b2d;
+  --muted: #5b6b80;
+  --line: #e3e8ef;
+  --accent: #3451d1;
+  --accent-hover: #2a43b3;
+  --on-accent: #fff;
+  --tint: #eef2ff;
+  --deep: #0b1b3f;
 }
 * {
   box-sizing: border-box;
@@ -207,10 +209,10 @@ input[type="radio"] {
 }
 .btn-primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .btn-primary:hover:not(:disabled) {
-  background: #06664f;
+  background: var(--accent-hover);
 }
 .btn-outline {
   border-color: var(--line);
@@ -298,14 +300,14 @@ input[type="radio"] {
   margin: 0 4px;
 }
 .journey-visual {
-  background: #e9f2ec;
-  border: 1px solid #dbe8df;
+  background: #eef2ff;
+  border: 1px solid #dfe5f5;
   border-radius: 14px;
   min-height: 425px;
   padding: 27px 26px 22px;
   position: relative;
   overflow: hidden;
-  color: #183e31;
+  color: #14234a;
 }
 .journey-top {
   display: flex;
@@ -314,7 +316,7 @@ input[type="radio"] {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.14em;
-  color: #638374;
+  color: #5b6b8f;
 }
 .journey-caption {
   font-size: 23px;
@@ -329,12 +331,12 @@ input[type="radio"] {
 }
 .journey-tile {
   position: absolute;
-  border: 1px solid #d4e6d9;
-  background: #f9fcfa;
+  border: 1px solid #d8e0f5;
+  background: #fbfcff;
   padding: 18px 17px;
   width: 62%;
   height: 110px;
-  box-shadow: 0 9px 20px #1c523610;
+  box-shadow: 0 9px 20px #1a2f6b14;
   border-radius: 8px;
   display: flex;
   flex-direction: column;
@@ -371,22 +373,22 @@ input[type="radio"] {
   bottom: 69px;
   left: 19%;
   z-index: 2;
-  background: #c8e3d3;
+  background: #d6dffb;
 }
 .tile-3 {
   bottom: 138px;
   left: 38%;
   z-index: 1;
-  background: #087b60;
-  border-color: #087b60;
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
 }
 .journey-bottom {
   display: flex;
   justify-content: space-between;
   margin-top: 24px;
   font-size: 10px;
-  color: #678174;
+  color: #5b6b8f;
 }
 .journey-bottom span:first-child {
   display: flex;
@@ -489,7 +491,7 @@ input[type="radio"] {
   letter-spacing: 0.015em;
   font-weight: 550;
   background: var(--accent);
-  color: white;
+  color: var(--on-accent);
   border-radius: 5px;
   padding: 5px 12px;
   display: inline-flex;
@@ -702,20 +704,20 @@ details[open] summary svg {
   gap: 30px;
 }
 .cta .eyebrow {
-  color: #a8cfc0;
+  color: #a9b8e6;
   font-size: 10px;
 }
 .cta h2 {
   margin-top: 16px;
 }
 .cta p {
-  color: #abcabe;
+  color: #b3c0e3;
   margin-top: 18px;
   font-size: 14px;
 }
 .cta .btn {
   background: #fff;
-  color: #073e31;
+  color: #0b1b3f;
   white-space: nowrap;
 }
 .footer-top {
@@ -826,7 +828,7 @@ details[open] summary svg {
 }
 .segmented .selected {
   background: var(--accent);
-  color: white;
+  color: var(--on-accent);
 }
 .checkbox {
   display: flex;
@@ -1130,7 +1132,7 @@ details[open] summary svg {
 }
 .complete .timeline-icon,
 .active .timeline-icon {
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
   border-color: var(--accent);
 }
@@ -1269,7 +1271,7 @@ details[open] summary svg {
 }
 .wizard-steps .active span {
   background: var(--accent);
-  color: white;
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 .product-options {
@@ -1303,30 +1305,45 @@ details[open] summary svg {
 }
 .dark {
   color-scheme: dark;
-  --bg: #101d19;
-  --surface: #172720;
-  --ink: #e2eee7;
-  --muted: #a1b6aa;
-  --line: #30473a;
-  --accent: #26a780;
-  --tint: #153d30;
-  --deep: #082e22;
+  --bg: #0b1220;
+  --surface: #111a2e;
+  --ink: #e6ebf5;
+  --muted: #94a3bd;
+  --line: #223049;
+  --accent: #7b96ff;
+  --accent-hover: #97adff;
+  --on-accent: #0b1220;
+  --tint: #16213d;
+  --deep: #0f1a36;
 }
 .dark .journey-visual {
-  filter: brightness(0.87);
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink);
 }
-.dark .btn-primary {
-  color: #061c13;
+.dark .journey-top,
+.dark .journey-bottom {
+  color: var(--muted);
 }
-.dark .badge {
-  color: #061c13;
+.dark .journey-tile {
+  background: var(--tint);
+  border-color: #2a3a5c;
+  box-shadow: none;
 }
-.dark .cta .btn {
-  color: #073e31;
+.dark .tile-2 {
+  background: #1d2c52;
+}
+.dark .tile-3 {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.dark .cta {
+  border: 1px solid var(--line);
 }
 .dark .complete .timeline-icon,
 .dark .active .timeline-icon {
-  color: #061c13;
+  color: var(--on-accent);
 }
 a:hover {
   text-decoration-color: var(--accent);
