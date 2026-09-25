@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Check, ArrowUpRight, Plus, ArrowRight, Info } from "lucide-react";
+import { Check, Plus, ArrowRight, Info } from "lucide-react";
 import { useI18n } from "../i18n";
 import { Button } from "../components/ui/button";
 export const products = [
@@ -28,14 +28,14 @@ export const products = [
   { id: "itin_return", name: "ITIN + 1040-NR", price: 400, renew: 0, state: 0 },
   {
     id: "bundle_wy",
-    name: "Bundle Wyoming",
+    name: "Старт в США · WY",
     price: 549,
     renew: 149,
     state: 60,
   },
   {
     id: "bundle_de",
-    name: "Bundle Delaware",
+    name: "Старт в США · DE",
     price: 649,
     renew: 199,
     state: 400,
@@ -50,12 +50,11 @@ export function PricingCards({ full = false }: { full?: boolean }) {
           className={"price-card " + (i === 0 ? "featured" : "")}
           key={p.id}
         >
-          {(i === 0 || i === 3) && (
-            <span className="badge">{i === 0 ? t.recommended : t.popular}</span>
+          {i === 0 && (
+            <span className="badge">{t.recommended}</span>
           )}
           <div className="price-top">
             <span className="card-number">0{i + 1}</span>
-            <ArrowUpRight size={22} />
           </div>
           <h3>{i > 3 ? t.bundle + " · " + (i === 4 ? "WY" : "DE") : p.name}</h3>
           <p className="price-desc">
@@ -74,6 +73,7 @@ export function PricingCards({ full = false }: { full?: boolean }) {
             ${p.price}
             <span>USD</span>
           </div>
+          {i > 3 && <p className="price-extra">{lang === "ru" ? "Экономия $59 + консультация в подарок" : "Save $59 + consultation included"}</p>}
           <div className="price-context">
             {p.renew
               ? `${t.renewal} $${p.renew}/${t.year}`
