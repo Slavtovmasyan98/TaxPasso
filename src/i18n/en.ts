@@ -40,7 +40,7 @@ const en: typeof ru = {
   year: "year",
   renewal: "Renewal",
   from: "from",
-  allPlans: "All plans & calculator",
+  allPlans: "All plans",
   llcItems: [
     "State formation filing fee",
     "Registered Agent for year one",
@@ -49,7 +49,7 @@ const en: typeof ru = {
     "Bank & Stripe checklist",
   ],
   wyDesc: "For independent businesses and a confident start.",
-  deDesc: "For founders considering investment.",
+  deDesc: "A recognized state for partners, banks and counterparties.",
   itinDesc:
     "For applicants with a prepared return or a confirmed IRS exception.",
   itinFullDesc: "Includes preparation of your tax return.",
@@ -116,9 +116,9 @@ const en: typeof ru = {
   itinProcess: "First, eligibility. Then, documents.",
   itinProcessText:
     "A CAA partner reviews the tax basis, agrees the documents and conducts a video interview. During the interview, the agent must possess originals or copies certified by the issuing agency. A scan or notarized copy alone is not sufficient. Delivery and return arrangements are agreed in advance.",
-  quizTitle: "Check your first step",
+  quizTitle: "Can you qualify for an ITIN?",
   quizSub:
-    "4 questions before payment. A specialist confirms the outcome, not an automated quiz.",
+    "4 questions. A specialist confirms the outcome, not an automated quiz.",
   quizQuestions: [
     "Are you eligible for an SSN?",
     "Do you have a prepared tax return or a confirmed IRS exception?",
