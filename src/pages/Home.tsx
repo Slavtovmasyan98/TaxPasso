@@ -28,7 +28,6 @@ export function Steps() {
           <article key={s}>
             <div className="step-heading">
               <span>0{i + 1}</span>
-              <CornerRightUp size={24} />
             </div>
             <h3>{s}</h3>
             <p>{t.stepText[i]}</p>
@@ -78,7 +77,7 @@ export function CTA() {
       <Button asChild>
         <Link to="/app/new">
           {t.start}
-          <ArrowUpRight size={20} />
+          <ArrowRight size={20} />
         </Link>
       </Button>
     </section>
@@ -105,7 +104,7 @@ export function Home() {
               <Button asChild>
                 <Link to="/app/new?product=llc_wy">
                   {t.open}
-                  <ArrowUpRight size={19} />
+                  <ArrowRight size={19} />
                 </Link>
               </Button>
               <Button asChild variant="outline">
@@ -137,7 +136,6 @@ export function Home() {
                 <span>01 / LLC</span>
                 <b>{lang === "ru" ? "Ваша компания" : "Your company"}</b>
                 <small>Wyoming / Delaware</small>
-                <ArrowUpRight />
               </div>
               <div className="journey-tile tile-2">
                 <span>02 / EIN</span>
@@ -209,7 +207,7 @@ export function Home() {
         <section className="section">
           <div className="section-header">
             <div>
-              <span className="eyebrow">TAXPASSO & OTHERS</span>
+              <span className="eyebrow">{lang === "ru" ? "TAXPASSO И ДРУГИЕ" : "TAXPASSO & OTHERS"}</span>
               <h2>{t.compare}</h2>
             </div>
             <p>{t.compareSub}</p>
@@ -241,7 +239,7 @@ export function Home() {
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Doola ↗
+                      Doola <ArrowUpRight size={15} />
                     </a>
                   </td>
                   <td>
@@ -262,7 +260,7 @@ export function Home() {
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Firstbase ↗
+                      Firstbase <ArrowUpRight size={15} />
                     </a>
                   </td>
                   <td>
@@ -283,7 +281,7 @@ export function Home() {
                       target="_blank"
                       rel="noreferrer"
                     >
-                      Stripe Atlas ↗
+                      Stripe Atlas <ArrowUpRight size={15} />
                     </a>
                   </td>
                   <td>$500</td>
@@ -297,19 +295,18 @@ export function Home() {
             </table>
           </div>
           <p className="fineprint">{t.comparisonNote}</p>
+          <p className="fineprint">{lang === "ru" ? "Данные проверены: [ДАТА]" : "Data checked: [DATE]"}</p>
         </section>
         <section className="section review-section">
-          <span className="eyebrow">
-            {lang === "ru" ? "ОПЫТ ОСНОВАТЕЛЕЙ" : "FOUNDER EXPERIENCES"}
-          </span>
-          <h2>{t.reviews}</h2>
-          <p className="muted">{t.reviewsSub}</p>
-          <div className="review-card">
-            <span className="quote-mark">“</span>
-            <p>{t.reviewQuote}</p>
-            <span className="badge neutral">{t.reviewPlaceholder}</span>
+          <span className="eyebrow">{lang === "ru" ? "ДАННЫЕ И БЕЗОПАСНОСТЬ" : "DATA & SECURITY"}</span>
+          <h2>{lang === "ru" ? "Как мы работаем с вашими данными" : "How we work with your data"}</h2>
+          <div className="steps">
+            <article><h3>{lang === "ru" ? "Партнёр CAA / CPA" : "CAA / CPA partner"}</h3><p>{lang === "ru" ? "Подаёт документы в IRS в рамках согласованного заказа." : "Submits documents to the IRS within the agreed scope."}</p></article>
+            <article><h3>{lang === "ru" ? "Файлы зашифрованы" : "Encrypted files"}</h3><p>{lang === "ru" ? "Документы хранятся в приватном хранилище." : "Documents are stored in private storage."}</p></article>
+            <article><h3>{lang === "ru" ? "Ограниченный доступ" : "Restricted access"}</h3><p>{lang === "ru" ? "Доступ только у вас, назначенного партнёра и администратора." : "Access is limited to you, your assigned partner and an administrator."}</p></article>
           </div>
         </section>
+        <section className="section"><div className="section-header"><div><span className="eyebrow">{lang === "ru" ? "СРОКИ" : "TIMELINES"}</span><h2>{lang === "ru" ? "Ориентиры по срокам" : "Estimated timelines"}</h2></div></div><div className="steps"><article><h3>LLC</h3><p>[СРОК / ESTIMATE]</p></article><article><h3>EIN</h3><p>{t.einTiming}</p></article><article><h3>ITIN</h3><p>{lang === "ru" ? "После проверки CAA; срок определяет IRS." : "After CAA review; timing is controlled by the IRS."}</p></article></div></section>
         <FAQBlock />
         <CTA />
       </div>
