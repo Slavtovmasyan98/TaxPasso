@@ -38,10 +38,38 @@ export function Onboarding() {
   const needsGate = itin || product.startsWith("bundle");
   const [submitted, setSubmitted] = useState(false);
   const countries = useMemo(() => countryList(lang), [lang]);
+  async function ensureDraft() {
+    if (id || demoMode) {
+      if (demoMode && !id) setId("demo-new");
+      return;
+    }
+    if (!supabase || !session) throw new Error("Sign in required");
+    const { data, error } = await supabase
+      .from("orders")
+      .insert({
+        client_id: session.user.id,
+        product,
+        applicant: {},
+        status: "draft",
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    setId(data.id);
+    refresh();
+  }
   async function next() {
     setMessage("");
     if (step === 0) {
-      setStep(1);
+      setBusy(true);
+      try {
+        await ensureDraft();
+        setStep(1);
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : t.error);
+      } finally {
+        setBusy(false);
+      }
       return;
     }
     if (step === 1) {
@@ -61,30 +89,16 @@ export function Onboarding() {
       }
       setBusy(true);
       try {
-        if (!id) {
-          const { data, error } = await supabase!
-            .from("orders")
-            .insert({
-              client_id: session!.user.id,
-              product,
-              applicant: form,
-              status: "draft",
-            })
-            .select("id")
-            .single();
-          if (error) throw error;
-          setId(data.id);
-        } else {
-          const { error } = await supabase!
-            .from("orders")
-            .update({ applicant: form })
-            .eq("id", id);
-          if (error) throw error;
-        }
+        await ensureDraft();
+        const { error } = await supabase!
+          .from("orders")
+          .update({ applicant: form })
+          .eq("id", id);
+        if (error) throw error;
         setStep(2);
         refresh();
-      } catch {
-        setMessage(t.error);
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : t.error);
       } finally {
         setBusy(false);
       }
