@@ -7,7 +7,6 @@ import {
   FileCheck2,
   Globe2,
   ChevronDown,
-  CornerRightUp,
 } from "lucide-react";
 import { useI18n } from "../i18n";
 import { Button } from "../components/ui/button";
@@ -66,11 +65,11 @@ export function FAQBlock({ all = false }: { all?: boolean }) {
   );
 }
 export function CTA() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   return (
     <section className="cta">
       <div>
-        <span className="eyebrow">LET’S TAKE THE FIRST STEP</span>
+        <span className="eyebrow">{lang === "ru" ? "СДЕЛАЕМ ПЕРВЫЙ ШАГ" : "LET’S TAKE THE FIRST STEP"}</span>
         <h2>{t.cta}</h2>
         <p>{t.ctaSub}</p>
       </div>
@@ -141,7 +140,6 @@ export function Home() {
                 <span>02 / EIN</span>
                 <b>{lang === "ru" ? "Номер компании" : "Your business ID"}</b>
                 <small>Internal Revenue Service</small>
-                <ArrowUpRight />
               </div>
               <div className="journey-tile tile-3">
                 <span>03 / ITIN</span>
