@@ -201,7 +201,19 @@ const en: typeof ru = {
   demoEnter: "Explore the demo account",
   authDisabled: "Authentication is available once Supabase is connected.",
   signOut: "Sign out",
-  checkEmail: "Check your email to confirm your account.",
+  checkEmail:
+    "We sent you an email with a link. Open it to confirm your email, then sign in.",
+  noAccountYet: "No account yet?",
+  haveAccount: "Already have an account?",
+  authErrors: {
+    invalid_credentials:
+      "Wrong email or password. If you have not registered yet, choose “Create account”.",
+    email_not_confirmed:
+      "Email not confirmed. Open the email from Taxpasso and follow the link.",
+    user_already_exists: "An account with this email already exists. Please sign in.",
+    weak_password: "Password is too weak: at least 8 characters.",
+    rate_limit: "Too many attempts. Please wait a few minutes and try again.",
+  },
   loading: "Loading…",
   error: "Unable to complete the action. Please try again.",
   noAccess: "Sign in to open your account.",

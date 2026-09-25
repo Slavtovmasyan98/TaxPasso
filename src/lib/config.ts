@@ -9,6 +9,10 @@ export const SUPABASE_URL = url || "";
 export const SUPABASE_ANON_KEY = key || "";
 export const CONFIG_ERROR = !DEMO_MODE && !(url && key);
 
+// Кнопка «Продолжить с Google» показывается только после настройки провайдера в Supabase:
+// VITE_GOOGLE_AUTH=true в переменных Vercel.
+export const GOOGLE_AUTH_ENABLED = import.meta.env.VITE_GOOGLE_AUTH === "true";
+
 // Версии юридических документов. Меняйте при каждом обновлении текстов Terms / Refund Policy:
 // версия сохраняется вместе с согласием клиента.
 export const LEGAL_VERSIONS = {

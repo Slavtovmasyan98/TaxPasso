@@ -2,8 +2,26 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, LockKeyhole } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { GOOGLE_AUTH_ENABLED } from "../lib/config";
 import { useI18n } from "../i18n";
 import { Button } from "../components/ui/button";
+
+// Переводит код ошибки Supabase Auth в понятное сообщение.
+function authMessage(
+  error: unknown,
+  errors: Record<string, string>,
+  fallback: string,
+) {
+  const code =
+    typeof error === "object" && error && "code" in error
+      ? String((error as { code?: string }).code || "")
+      : "";
+  if (code === "over_email_send_rate_limit" || code === "over_request_rate_limit")
+    return errors.rate_limit;
+  if (code === "email_exists") return errors.user_already_exists;
+  return errors[code] || fallback;
+}
+
 export function Login() {
   const { t } = useI18n();
   const [email, setEmail] = useState("");
@@ -12,6 +30,12 @@ export function Login() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
+
+  function switchMode(value: boolean) {
+    setSignup(value);
+    setMessage("");
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!supabase) return;
@@ -20,20 +44,24 @@ export function Login() {
     try {
       const { data, error } = signup
         ? await supabase.auth.signUp({
-            email,
+            email: email.trim().toLowerCase(),
             password,
             options: { emailRedirectTo: location.origin + "/app" },
           })
-        : await supabase.auth.signInWithPassword({ email, password });
+        : await supabase.auth.signInWithPassword({
+            email: email.trim().toLowerCase(),
+            password,
+          });
       if (error) throw error;
       if (data.session) navigate("/app");
       else setMessage(t.checkEmail);
-    } catch {
-      setMessage(t.error);
+    } catch (error) {
+      setMessage(authMessage(error, t.authErrors, t.error));
     } finally {
       setBusy(false);
     }
   }
+
   async function google() {
     if (!supabase) return;
     setBusy(true);
@@ -42,21 +70,54 @@ export function Login() {
       options: { redirectTo: location.origin + "/app" },
     });
     if (error) {
-      setMessage(t.error);
+      setMessage(authMessage(error, t.authErrors, t.error));
       setBusy(false);
     }
   }
+
   return (
     <div className="container page auth-page">
       <div className="panel">
         <LockKeyhole size={32} />
-        <h1>{t.authTitle}</h1>
+        <h1>{signup ? t.signUp : t.authTitle}</h1>
         <p className="muted">{t.authSub}</p>
         {!supabase && <p className="notice">{t.authDisabled}</p>}
-        <Button variant="outline" disabled={!supabase || busy} onClick={google}>
-          {t.google}
-        </Button>
-        <p className="auth-or">{t.or}</p>
+
+        <div className="segmented" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!signup}
+            className={!signup ? "selected" : ""}
+            onClick={() => switchMode(false)}
+          >
+            {t.signIn}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={signup}
+            className={signup ? "selected" : ""}
+            onClick={() => switchMode(true)}
+          >
+            {t.signUp}
+          </button>
+        </div>
+
+        {GOOGLE_AUTH_ENABLED && (
+          <>
+            <Button
+              variant="outline"
+              disabled={!supabase || busy}
+              onClick={google}
+              style={{ marginTop: 20 }}
+            >
+              {t.google}
+            </Button>
+            <p className="auth-or">{t.or}</p>
+          </>
+        )}
+
         <form onSubmit={submit}>
           <label>
             {t.email}
@@ -84,10 +145,24 @@ export function Login() {
             <ArrowRight size={17} />
           </Button>
         </form>
-        <p role="status">{message}</p>
-        <button className="text-link" onClick={() => setSignup(!signup)}>
-          {signup ? t.signIn : t.signUp}
-        </button>
+
+        {message && (
+          <p className="notice" role="status">
+            {message}
+          </p>
+        )}
+
+        <p className="muted" style={{ marginTop: 16, fontSize: 14 }}>
+          {signup ? t.haveAccount : t.noAccountYet}{" "}
+          <button
+            type="button"
+            className="text-link"
+            onClick={() => switchMode(!signup)}
+          >
+            {signup ? t.signIn : t.signUp}
+          </button>
+        </p>
+
         {!supabase && (
           <Link className="text-link" to="/app">
             {t.demoEnter}

@@ -63,7 +63,7 @@ export function AppLayout() {
   const [orders, setOrders] = useState<Order[]>(demoMode ? [sample] : []);
   const [error, setError] = useState("");
   function refresh() {
-    if (!supabase) return;
+    if (!supabase || !session) return;
     supabase
       .from("orders")
       .select("*,order_status_history(*)")
@@ -77,8 +77,8 @@ export function AppLayout() {
       });
   }
   useEffect(() => {
-    refresh();
     if (!supabase || !session) return;
+    refresh();
     const channel = supabase
       .channel("order-updates")
       .on(
