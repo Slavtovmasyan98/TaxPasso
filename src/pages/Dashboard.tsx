@@ -248,6 +248,18 @@ export function Dashboard() {
   const { orders, role, refresh } = useOutletContext<AppContext>();
   const [msg, setMsg] = useState("");
   // Карточки зарегистрированных компаний (заполняет партнёр/админ после регистрации)
+  // Возвраты по заказам клиента (фиксирует администратор)
+  const [refunds, setRefunds] = useState<
+    { id: string; order_id: string; amount_cents: number; scope: string; reason: string; created_at: string }[]
+  >([]);
+  useEffect(() => {
+    if (!supabase) return;
+    supabase
+      .from("order_refunds")
+      .select("id,order_id,amount_cents,scope,reason,created_at")
+      .order("created_at")
+      .then(({ data }) => setRefunds(data || []));
+  }, [orders.length]);
   const [companies, setCompanies] = useState<
     { order_id: string; name: string; state: string; ein: string | null; registered_on: string | null }[]
   >([]);
@@ -331,6 +343,23 @@ export function Dashboard() {
       ) : (
         orders.map((o) => (
           <div key={o.id}>
+            {(() => {
+              const x = o as unknown as { cancelled_at?: string | null; cancel_reason?: string | null };
+              return x.cancelled_at ? (
+                <p className="notice">
+                  <LockKeyhole size={16} />
+                  {lang === "ru" ? "Заказ отменён" : "Order cancelled"}{" "}
+                  {new Date(x.cancelled_at).toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US")}
+                  {x.cancel_reason ? ` · ${x.cancel_reason}` : ""}
+                </p>
+              ) : null;
+            })()}
+            {refunds.filter((r) => r.order_id === o.id).map((r) => (
+              <p className="notice" key={r.id}>
+                {lang === "ru" ? "Возврат" : "Refund"} ${(r.amount_cents / 100).toFixed(2)} ·{" "}
+                {new Date(r.created_at).toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US")} · {r.reason}
+              </p>
+            ))}
             <OrderTracker order={o} />
             {o.itin_status && (
               <OrderTracker
@@ -440,6 +469,7 @@ export function Documents() {
     const { data, error } = await supabase
       .from("documents")
       .select("*")
+      .is("superseded_at", null)
       .order("created_at", { ascending: false });
     if (error) setMsg(t.error);
     else setDocs(data || []);
@@ -453,6 +483,37 @@ export function Documents() {
   useEffect(() => {
     load();
   }, []);
+  // Новая версия отклонённого документа: тот же заказ, тот же тип, старая версия помечается заменённой.
+  async function replaceDocument(prev: Doc, file: File) {
+    if (!supabase) return;
+    if (file.size > 10 * 1024 * 1024 || !["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
+      setMsg("PDF, JPG, PNG ≤ 10 MB");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw Error("Sign in");
+      const ext = file.type === "application/pdf" ? "pdf" : file.type === "image/png" ? "png" : "jpg";
+      const path = `${prev.order_id}/${crypto.randomUUID()}.${ext}`;
+      const up = await supabase.storage.from("documents").upload(path, file, { contentType: file.type, upsert: false });
+      if (up.error) throw up.error;
+      const { error } = await supabase.from("documents").insert({
+        order_id: prev.order_id, uploaded_by: user.id, path, name: file.name,
+        mime_type: file.type, size_bytes: file.size, replaces_document_id: prev.id,
+      });
+      if (error) {
+        await supabase.storage.from("documents").remove([path]);
+        throw error;
+      }
+      await load();
+      setMsg(lang === "ru" ? "Новая версия загружена и отправлена на проверку" : "New version uploaded for review");
+    } catch {
+      setMsg(t.error);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function upload(file?: File) {
     if (!file || !orderId) return;
     setBusy(true);
@@ -573,7 +634,22 @@ export function Documents() {
               {t.download}
               <ArrowUpRight size={16} />
             </Button></div>
-            {d.review_status === "rejected" && <Button variant="outline" onClick={() => { setOrderId(d.order_id); document.getElementById("document-upload")?.click(); }}>{lang === "ru" ? "Загрузить заново" : "Upload again"}</Button>}
+            {d.review_status === "rejected" && (
+              <label className="btn btn-outline" style={{ cursor: "pointer" }}>
+                {lang === "ru" ? "Загрузить заново" : "Upload again"}
+                <input
+                  type="file"
+                  hidden
+                  accept="application/pdf,image/jpeg,image/png"
+                  disabled={busy}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) replaceDocument(d, f);
+                  }}
+                />
+              </label>
+            )}
             <span className="fineprint">{d.review_status === "accepted" ? (lang === "ru" ? "Принят" : "Accepted") : d.review_status === "rejected" ? (lang === "ru" ? "Отклонён" : "Rejected") : (lang === "ru" ? "На проверке" : "Under review")}{d.review_comment ? ` · ${d.review_comment}` : ""}</span>
           </div>
         ))
