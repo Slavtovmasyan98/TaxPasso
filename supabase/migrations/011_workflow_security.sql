@@ -352,6 +352,8 @@ begin
   if p_stream not in ('main', 'itin') then raise exception 'Invalid stream'; end if;
   select * into o from public.orders where id = p_order for update;
   if not taxpasso_private.claim_op(p_op, 'propose_status', p_order) then return 'already_done'; end if;
+  if o.cancelled_at is not null then raise exception 'Order cancelled'; end if;
+  if o.closed_at is not null then raise exception 'Order closed'; end if;
   select proposed_status into cur from public.status_proposals where order_id = p_order and stream = p_stream;
   cur := coalesce(cur, case when p_stream = 'itin' then o.itin_status else o.status end);
   if cur = p_to then return 'already_done'; end if;
