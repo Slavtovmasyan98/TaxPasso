@@ -225,6 +225,17 @@ export function Dashboard() {
   const { t, lang } = useI18n();
   const { orders, role, refresh } = useOutletContext<AppContext>();
   const [msg, setMsg] = useState("");
+  // Карточки зарегистрированных компаний (заполняет партнёр/админ после регистрации)
+  const [companies, setCompanies] = useState<
+    { order_id: string; name: string; state: string; ein: string | null; registered_on: string | null }[]
+  >([]);
+  useEffect(() => {
+    if (!supabase) return;
+    supabase
+      .from("companies")
+      .select("order_id,name,state,ein,registered_on")
+      .then(({ data }) => setCompanies(data || []));
+  }, [orders.length]);
   async function advance(order: Order) {
     if (!supabase) return;
     const codes = order.product.startsWith("itin") ? itinCodes : llcCodes;
@@ -239,6 +250,26 @@ export function Dashboard() {
   }
   return (
     <>
+      {companies.map((c) => (
+        <div className="panel" key={c.order_id} style={{ marginBottom: 20, display: "flex", gap: 24, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ flex: "1 1 220px" }}>
+            <span className="eyebrow">{lang === "ru" ? "ВАША КОМПАНИЯ" : "YOUR COMPANY"}</span>
+            <h2 style={{ margin: "8px 0 0" }}>{c.name}</h2>
+          </div>
+          <div>
+            <small className="muted">{lang === "ru" ? "Штат" : "State"}</small>
+            <div><b>{c.state === "DE" ? "Delaware" : "Wyoming"}</b></div>
+          </div>
+          <div>
+            <small className="muted">EIN</small>
+            <div><b>{c.ein || (lang === "ru" ? "ожидается" : "pending")}</b></div>
+          </div>
+          <div>
+            <small className="muted">{lang === "ru" ? "Дата регистрации" : "Formed on"}</small>
+            <div><b>{c.registered_on ? new Date(c.registered_on + "T12:00:00").toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US") : "—"}</b></div>
+          </div>
+        </div>
+      ))}
       <div className="dashboard-metrics">
         <div>
           <span>{t.orders}</span>
@@ -362,7 +393,7 @@ export function Documents() {
   const [docs, setDocs] = useState<Doc[]>([]);
   // Готовые документы от партнёра, которые администратор передал клиенту
   const [readyDocs, setReadyDocs] = useState<
-    { id: string; name: string; path: string; order_id: string; created_at: string; published_at: string | null }[]
+    { id: string; name: string; path: string; order_id: string; created_at: string; published_at: string | null; doc_type?: string }[]
   >([]);
   const [orderId, setOrderId] = useState("");
   const [busy, setBusy] = useState(false);
@@ -377,7 +408,7 @@ export function Documents() {
     else setDocs(data || []);
     const { data: ready } = await supabase
       .from("partner_documents")
-      .select("id,name,path,order_id,created_at,published_at")
+      .select("id,name,path,order_id,created_at,published_at,doc_type")
       .eq("visibility", "published")
       .order("published_at", { ascending: false });
     setReadyDocs(ready || []);
@@ -442,9 +473,11 @@ export function Documents() {
             <div className="document-row" key={d.id}>
               <FileText />
               <div>
-                <b>{d.name}</b>
+                <b>
+                  {({ articles: "Articles of Organization", ein_letter: lang === "ru" ? "Письмо EIN" : "EIN letter", operating_agreement: "Operating Agreement" } as Record<string, string>)[d.doc_type || ""] || d.name}
+                </b>
                 <small>
-                  {new Date(d.published_at || d.created_at).toLocaleDateString(
+                  {d.name} · {new Date(d.published_at || d.created_at).toLocaleDateString(
                     lang === "ru" ? "ru-RU" : "en-US",
                   )}
                   {" · "}
