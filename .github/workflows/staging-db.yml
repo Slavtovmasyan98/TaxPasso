@@ -1,0 +1,45 @@
+# Применяет миграции из supabase/migrations к STAGING-базе (taxpasso-staging).
+# Запуск вручную: GitHub → Actions → "staging-db" → Run workflow.
+# Секрет STAGING_DB_URL: строка подключения staging (Session pooler) из Supabase → Connect.
+# Рабочую базу этот workflow не трогает: он отказывается работать с её ref.
+name: staging-db
+on:
+  workflow_dispatch:
+
+jobs:
+  push-migrations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Guard — only staging
+        env:
+          DB_URL: ${{ secrets.STAGING_DB_URL }}
+        run: |
+          test -n "$DB_URL" || { echo "Нет секрета STAGING_DB_URL"; exit 1; }
+          python3 - <<'PY'
+          import os
+          import re
+          from urllib.parse import urlsplit, unquote
+          expected = "dgkiolejzgefzekunlnn"
+          try:
+              url = urlsplit(os.environ["DB_URL"])
+              host = url.hostname or ""
+              user = unquote(url.username or "")
+              direct = host == f"db.{expected}.supabase.co" and user == "postgres"
+              pooler = bool(re.fullmatch(r"aws-[0-9]+-[a-z0-9-]+\.pooler\.supabase\.com", host)) and user == f"postgres.{expected}"
+              valid = url.scheme in ("postgres", "postgresql") and url.path == "/postgres" and url.port in (None, 5432) and not url.query and not url.fragment and (direct or pooler)
+          except ValueError:
+              valid = False
+          if not valid:
+              raise SystemExit("Invalid staging connection. Use the staging Session pooler URL on port 5432.")
+          print("OK: staging")
+          PY
+      - name: Init config (if missing)
+        run: test -f supabase/config.toml || supabase init
+      - name: Push migrations to staging
+        env:
+          DB_URL: ${{ secrets.STAGING_DB_URL }}
+        run: supabase db push --db-url "$DB_URL" --yes
