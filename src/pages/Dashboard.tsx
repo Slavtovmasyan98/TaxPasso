@@ -58,7 +58,7 @@ const sample: Order = {
 };
 type AppContext = { orders: Order[]; refresh: () => void; role: string };
 export function AppLayout() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { session, loading, role } = useAuth();
   const [orders, setOrders] = useState<Order[]>(demoMode ? [sample] : []);
   const [error, setError] = useState("");
@@ -93,6 +93,28 @@ export function AppLayout() {
   }, [session]);
   if (loading) return <p className="container page">{t.loading}</p>;
   if (!demoMode && !session) return <Navigate to="/login" replace />;
+  // Кабинет партнёра — только в Taxpasso Partners. Клиентский сайт для партнёров закрыт.
+  if (role === "partner") {
+    return (
+      <div className="container page" style={{ maxWidth: 560 }}>
+        <div className="panel">
+          <LockKeyhole size={30} />
+          <h2>{lang === "ru" ? "Это партнёрский аккаунт" : "This is a partner account"}</h2>
+          <p className="muted">
+            {lang === "ru"
+              ? "Партнёры CAA/CPA работают в отдельном кабинете Taxpasso Partners."
+              : "CAA/CPA partners work in the separate Taxpasso Partners workspace."}
+          </p>
+          <div className="button-row">
+            <Button asChild>
+              <a href="https://taxpassopartners.vercel.app">Taxpasso Partners <ArrowUpRight size={16} /></a>
+            </Button>
+            <Button variant="outline" onClick={() => supabase?.auth.signOut()}>{t.signOut}</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="app-shell">
       <div className="container">
@@ -264,6 +286,15 @@ export function Dashboard() {
             <small className="muted">EIN</small>
             <div><b>{c.ein || (lang === "ru" ? "ожидается" : "pending")}</b></div>
           </div>
+          {(() => {
+            const until = (orders.find((o) => o.id === c.order_id) as unknown as { service_until?: string | null } | undefined)?.service_until;
+            return until ? (
+              <div>
+                <small className="muted">{lang === "ru" ? "Обслуживание до" : "Service until"}</small>
+                <div><b>{new Date(until + "T12:00:00").toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US")}</b></div>
+              </div>
+            ) : null;
+          })()}
           <div>
             <small className="muted">{lang === "ru" ? "Дата регистрации" : "Formed on"}</small>
             <div><b>{c.registered_on ? new Date(c.registered_on + "T12:00:00").toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US") : "—"}</b></div>
@@ -311,7 +342,13 @@ export function Dashboard() {
                 }}
               />
             )}
-            {["partner", "admin"].includes(role) && (
+            {role === "admin" && (
+              <p className="fineprint">
+                {lang === "ru" ? "Управление заказом — в " : "Manage this order in "}
+                <a href="https://taxpassopartners.vercel.app" style={{ textDecoration: "underline" }}>Taxpasso Partners</a>
+              </p>
+            )}
+            {false && (
               <div className="button-row">
                 {role === "admin" && o.payment_status !== "paid" && <Button variant="outline" onClick={async () => { const note = window.prompt(lang === "ru" ? "Комментарий к ручной оплате (необязательно)" : "Manual payment note (optional)") || null; const { error } = await supabase!.rpc("mark_order_paid_manually", { p_order: o.id, p_note: note }); setMsg(operationMessage(error, lang, t.error)); refresh(); }}>{lang === "ru" ? "Отметить оплату" : "Mark paid"}</Button>}
                 <Button onClick={() => advance(o)}>

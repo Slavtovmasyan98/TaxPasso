@@ -1,0 +1,1 @@
+-- 009_two_key_workflow.sql применена в Supabase 26.09.2026. Полный текст: supabase_migrations.schema_migrations (name = 009_two_key_workflow).
