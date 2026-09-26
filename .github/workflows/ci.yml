@@ -1,0 +1,46 @@
+# Автопроверка на каждый push и pull request.
+# 1) build — сборка и проверка типов сайта.
+# 2) database — поднимает ЧИСТЫЙ Supabase с нуля, применяет supabase/migrations из репозитория
+#    и запускает тесты безопасности. Так проверяется, что проект поднимается из репозитория.
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Init local Supabase config (if missing)
+        run: test -f supabase/config.toml || supabase init
+      - name: Start clean Supabase and apply migrations from repo
+        run: supabase start
+      - name: Export local keys
+        run: supabase status -o env | sed -e 's/"//g' -e 's/^/LOCAL_/' >> "$GITHUB_ENV"
+      - run: npm ci
+      - name: Security tests
+        run: npm run test:security
+        env:
+          SUPABASE_URL: ${{ env.LOCAL_API_URL }}
+          SUPABASE_ANON_KEY: ${{ env.LOCAL_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}

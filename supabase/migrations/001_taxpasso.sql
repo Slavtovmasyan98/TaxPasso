@@ -1,5 +1,4 @@
 -- Apply to a new Supabase project. Roles cannot be self-assigned.
-begin;
 create type public.app_role as enum ('client','partner','admin');
 create type public.product_type as enum ('llc_wy','llc_de','itin_standard','itin_return','bundle_wy','bundle_de');
 create type public.order_status as enum ('draft','application','review','filed_state','registered','ein_requested','ein_received','documents','caa_interview','sent_irs','itin_received');
@@ -68,4 +67,3 @@ grant execute on function public.advance_bundle_itin(uuid) to authenticated;
 
 -- Optional realtime: initial REST fetch and reload work without publication.
 -- alter publication supabase_realtime add table public.orders;
-commit;

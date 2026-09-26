@@ -1,6 +1,5 @@
 -- 003_limits_eligibility.sql
 -- Откат: supabase/rollback/003_limits_eligibility_down.sql
-begin;
 
 -- Анкета в orders.applicant: не больше 16 КБ и только плоский объект со строками.
 -- Защищает базу от записи произвольных больших данных через API.
@@ -62,4 +61,3 @@ grant execute on function public.reject_eligibility(uuid, text) to authenticated
 -- applicant_is_flat используется в CHECK-ограничении, поэтому право на выполнение
 -- остаётся у всех ролей: иначе вставка заказа клиентом упадёт с ошибкой прав.
 
-commit;

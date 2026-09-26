@@ -2,7 +2,6 @@
 -- Шаг 1: фундамент базы данных.
 -- Только добавляет новое и не ломает текущий интерфейс.
 -- Откат: supabase/rollback/002_foundation_down.sql
-begin;
 
 -- ============================================================
 -- 1. Оплата
@@ -376,4 +375,3 @@ grant execute on function
   public.abandoned_draft_documents(integer)
 to service_role;
 
-commit;
