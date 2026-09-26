@@ -143,6 +143,7 @@ export function AppLayout() {
     </div>
   );
 }
+function operationMessage(error: { message?: string } | null, lang: string, fallback: string) { if (!error) return fallback; if (error.message === "Payment required") return lang === "ru" ? "Сначала нужна оплата" : "Payment required first"; if (error.message === "Eligibility approval required") return lang === "ru" ? "Сначала подтвердите основание ITIN" : "Approve ITIN eligibility first"; return fallback; }
 function InfoIcon() {
   return <LockKeyhole size={16} />;
 }
@@ -152,6 +153,7 @@ export function OrderTracker({ order }: { order: Order }) {
   const codes = isItin ? itinCodes : llcCodes;
   const labels = isItin ? t.itinStatuses : t.llcStatuses;
   const current = codes.indexOf(order.status);
+  const paymentLabel = order.payment_status === "paid" ? (lang === "ru" ? "Оплачено" : "Paid") : (lang === "ru" ? "Ожидает оплаты" : "Awaiting payment");
   return (
     <article className="panel tracker">
       <div className="tracker-head">
@@ -166,6 +168,9 @@ export function OrderTracker({ order }: { order: Order }) {
         </div>
         <span className="badge">{labels[current] || t.draft}</span>
       </div>
+      <div className="button-row"><span className={"badge " + (order.payment_status === "paid" ? "success" : "neutral")}>{paymentLabel}</span>{order.payment_marked_manually && <span className="fineprint">{lang === "ru" ? "Оплата отмечена вручную" : "Payment marked manually"}</span>}</div>
+      {order.eligibility === "rejected" && <p className="notice" role="alert">{lang === "ru" ? "ITIN отклонён" : "ITIN rejected"}{order.eligibility_note ? ": " + order.eligibility_note : ""}</p>}
+      {order.eligibility === "pending" && (order.product.startsWith("itin") || order.product.startsWith("bundle")) && <p className="notice">{lang === "ru" ? "ITIN на проверке партнёром" : "ITIN under partner review"}</p>}
       <ol className="timeline">
         {codes.map((s, i) => {
           const history = order.order_status_history?.find(
@@ -229,7 +234,7 @@ export function Dashboard() {
       p_order: order.id,
       p_status: next,
     });
-    setMsg(error ? t.error : t.saved);
+    setMsg(error ? (error.message === "Payment required" ? (lang === "ru" ? "Сначала нужна оплата" : "Payment required first") : t.error) : t.saved);
     refresh();
   }
   return (
@@ -277,6 +282,7 @@ export function Dashboard() {
             )}
             {["partner", "admin"].includes(role) && (
               <div className="button-row">
+                {role === "admin" && o.payment_status !== "paid" && <Button variant="outline" onClick={async () => { const note = window.prompt(lang === "ru" ? "Комментарий к ручной оплате (необязательно)" : "Manual payment note (optional)") || null; const { error } = await supabase!.rpc("mark_order_paid_manually", { p_order: o.id, p_note: note }); setMsg(operationMessage(error, lang, t.error)); refresh(); }}>{lang === "ru" ? "Отметить оплату" : "Mark paid"}</Button>}
                 <Button onClick={() => advance(o)}>
                   {t.next} · {o.product.startsWith("itin") ? "ITIN" : "LLC"}
                 </Button>
@@ -298,21 +304,25 @@ export function Dashboard() {
                 {o.eligibility === "pending" &&
                   (o.product.startsWith("itin") ||
                     o.product.startsWith("bundle")) && (
-                    <Button
+                    <><Button
                       variant="outline"
                       onClick={async () => {
-                        const { error } = await supabase!.rpc(
-                          "approve_eligibility",
-                          { p_order: o.id },
-                        );
-                        setMsg(error ? t.error : t.saved);
-                        refresh();
+                        const { error } = await supabase!.rpc("approve_eligibility", { p_order: o.id });
+                        setMsg(error ? t.error : t.saved); refresh();
                       }}
                     >
-                      {lang === "ru"
-                        ? "Подтвердить основание ITIN"
-                        : "Confirm ITIN eligibility"}
-                    </Button>
+                      {lang === "ru" ? "Одобрить ITIN" : "Approve ITIN"}
+                    </Button><Button
+                      variant="outline"
+                      onClick={async () => {
+                        const reason = window.prompt(lang === "ru" ? "Причина отказа ITIN" : "ITIN rejection reason");
+                        if (!reason?.trim()) return;
+                        const { error } = await supabase!.rpc("reject_eligibility", { p_order: o.id, p_reason: reason });
+                        setMsg(error ? t.error : t.saved); refresh();
+                      }}
+                    >
+                      {lang === "ru" ? "Отклонить ITIN" : "Reject ITIN"}
+                    </Button></>
                   )}
               </div>
             )}
@@ -343,11 +353,17 @@ type Doc = {
   path: string;
   order_id: string;
   created_at: string;
+  review_status?: "pending" | "accepted" | "rejected";
+  review_comment?: string | null;
 };
 export function Documents() {
   const { t, lang } = useI18n();
-  const { orders } = useOutletContext<AppContext>();
+  const { orders, role } = useOutletContext<AppContext>();
   const [docs, setDocs] = useState<Doc[]>([]);
+  // Готовые документы от партнёра, которые администратор передал клиенту
+  const [readyDocs, setReadyDocs] = useState<
+    { id: string; name: string; path: string; order_id: string; created_at: string; published_at: string | null }[]
+  >([]);
   const [orderId, setOrderId] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -359,6 +375,12 @@ export function Documents() {
       .order("created_at", { ascending: false });
     if (error) setMsg(t.error);
     else setDocs(data || []);
+    const { data: ready } = await supabase
+      .from("partner_documents")
+      .select("id,name,path,order_id,created_at,published_at")
+      .eq("visibility", "published")
+      .order("published_at", { ascending: false });
+    setReadyDocs(ready || []);
   }
   useEffect(() => {
     load();
@@ -405,6 +427,7 @@ export function Documents() {
           type="file"
           accept="application/pdf,image/jpeg,image/png"
           disabled={demoMode || !orderId || busy}
+          id="document-upload"
           onChange={(e) => {
             upload(e.target.files?.[0]);
             e.target.value = "";
@@ -412,6 +435,44 @@ export function Documents() {
         />
       </label>
       <p role="status">{busy ? t.loading : msg}</p>
+      {readyDocs.length > 0 && (
+        <div className="ready-docs" style={{ marginTop: 24 }}>
+          <span className="eyebrow">{lang === "ru" ? "ГОТОВЫЕ ДОКУМЕНТЫ ОТ TAXPASSO" : "READY DOCUMENTS FROM TAXPASSO"}</span>
+          {readyDocs.map((d) => (
+            <div className="document-row" key={d.id}>
+              <FileText />
+              <div>
+                <b>{d.name}</b>
+                <small>
+                  {new Date(d.published_at || d.created_at).toLocaleDateString(
+                    lang === "ru" ? "ru-RU" : "en-US",
+                  )}
+                  {" · "}
+                  {orders.find((o) => o.id === d.order_id)?.applicant.company ||
+                    d.order_id.slice(0, 8)}
+                </small>
+              </div>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const url = await documentUrl(d.path);
+                    window.open(url, "_blank", "noopener,noreferrer");
+                  } catch {
+                    setMsg(t.error);
+                  }
+                }}
+              >
+                {t.download}
+                <ArrowUpRight size={16} />
+              </Button>
+            </div>
+          ))}
+          <span className="eyebrow" style={{ display: "block", marginTop: 28 }}>
+            {lang === "ru" ? "ВАШИ ДОКУМЕНТЫ" : "YOUR DOCUMENTS"}
+          </span>
+        </div>
+      )}
       {!docs.length ? (
         <p className="empty muted">{t.emptyDocs}</p>
       ) : (
@@ -426,6 +487,8 @@ export function Documents() {
                 )}
               </small>
             </div>
+            <div className="button-row">
+            {role === "admin" && <><Button variant="outline" onClick={async () => { const { error } = await supabase!.rpc("review_document", { p_document: d.id, p_status: "accepted", p_comment: null }); setMsg(error ? t.error : t.saved); load(); }}>{lang === "ru" ? "Принять" : "Accept"}</Button><Button variant="outline" onClick={async () => { const reason = window.prompt(lang === "ru" ? "Причина отклонения документа" : "Document rejection reason"); if (!reason?.trim()) return; const { error } = await supabase!.rpc("review_document", { p_document: d.id, p_status: "rejected", p_comment: reason }); setMsg(error ? t.error : t.saved); load(); }}>{lang === "ru" ? "Отклонить" : "Reject"}</Button></>}
             <Button
               variant="outline"
               onClick={async () => {
@@ -439,7 +502,9 @@ export function Documents() {
             >
               {t.download}
               <ArrowUpRight size={16} />
-            </Button>
+            </Button></div>
+            {d.review_status === "rejected" && <Button variant="outline" onClick={() => { setOrderId(d.order_id); document.getElementById("document-upload")?.click(); }}>{lang === "ru" ? "Загрузить заново" : "Upload again"}</Button>}
+            <span className="fineprint">{d.review_status === "accepted" ? (lang === "ru" ? "Принят" : "Accepted") : d.review_status === "rejected" ? (lang === "ru" ? "Отклонён" : "Rejected") : (lang === "ru" ? "На проверке" : "Under review")}{d.review_comment ? ` · ${d.review_comment}` : ""}</span>
           </div>
         ))
       )}
