@@ -31,6 +31,7 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
+          github-token: ${{ github.token }}
       - name: Init local Supabase config (if missing)
         run: test -f supabase/config.toml || supabase init
       - name: Start clean Supabase and apply migrations from repo
