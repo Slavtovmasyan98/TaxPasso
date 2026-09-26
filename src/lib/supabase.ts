@@ -29,6 +29,10 @@ export type Order = {
   created_at: string;
   applicant: Record<string, string>;
   eligibility: string;
+  eligibility_note?: string | null;
+  payment_status?: "unpaid" | "paid" | "refunded";
+  payment_note?: string | null;
+  payment_marked_manually?: boolean;
   partner_id?: string;
   order_status_history?: {
     status: string;
