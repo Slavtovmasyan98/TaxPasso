@@ -182,6 +182,8 @@ function InfoIcon() {
 export function OrderTracker({ order }: { order: Order }) {
   const { t, lang } = useI18n();
   const isItin = order.product.startsWith("itin") || order.product.startsWith("bundle");
+  // Bundles render a second tracker for ITIN; keep IRS details in that tracker only.
+  const showItinDetails = order.product.startsWith("itin");
   const isReturn = order.product === "itin_return";
   const codes = order.product.startsWith("itin") ? (isReturn ? itinReturnCodes : itinCodes) : llcCodes;
   const labels = order.product.startsWith("itin")
@@ -193,18 +195,30 @@ export function OrderTracker({ order }: { order: Order }) {
   const [itinInfo, setItinInfo] = useState<{ itin: string; assigned_on: string | null } | null>(null);
   const [irsEvents, setIrsEvents] = useState<{ id: string; kind: string; note: string; attempt: number; created_at: string }[]>([]);
   useEffect(() => {
-    if (!supabase || !isItin) return;
+    if (!supabase || !showItinDetails) return;
     let active = true;
-    Promise.all([
-      supabase.from("order_itin").select("itin,assigned_on").eq("order_id", order.id).maybeSingle(),
-      supabase.from("itin_irs_events").select("id,kind,note,attempt,created_at").eq("order_id", order.id).order("created_at", { ascending: false }),
-    ]).then(([itin, events]) => {
-      if (!active) return;
-      setItinInfo(itin.data || null);
-      setIrsEvents(events.data || []);
-    });
-    return () => { active = false; };
-  }, [order.id, isItin]);
+    const load = () => {
+      if (document.visibilityState === "hidden") return;
+      Promise.all([
+        supabase!.from("order_itin").select("itin,assigned_on").eq("order_id", order.id).maybeSingle(),
+        supabase!.from("itin_irs_events").select("id,kind,note,attempt,created_at").eq("order_id", order.id).order("created_at", { ascending: false }),
+      ]).then(([itin, events]) => {
+        if (!active) return;
+        if (!itin.error) setItinInfo(itin.data || null);
+        if (!events.error) setIrsEvents(events.data || []);
+      });
+    };
+    load();
+    window.addEventListener("focus", load);
+    document.addEventListener("visibilitychange", load);
+    const interval = window.setInterval(load, 30_000);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", load);
+      document.removeEventListener("visibilitychange", load);
+      window.clearInterval(interval);
+    };
+  }, [order.id, showItinDetails]);
   const paymentLabel = order.payment_status === "paid" ? (lang === "ru" ? "Оплачено" : "Paid") : (lang === "ru" ? "Ожидает оплаты" : "Awaiting payment");
   return (
     <article className="panel tracker">
