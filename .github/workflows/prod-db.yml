@@ -74,6 +74,17 @@ jobs:
       - name: Validate current production history
         id: history
         run: python3 scripts/prod_migrations.py before
+      - name: Back up schema, data and original history before any mutation
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.PROD_BACKUP_PASSPHRASE }}
+        run: python3 scripts/prod_backup.py
+      - name: Persist encrypted snapshot before allowing changes
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-db-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/prod-backup/production.dump.gpg
+          if-no-files-found: error
+          retention-days: 90
       - name: One-time history repair (no schema migrations)
         if: steps.history.outputs.needs_repair == 'true'
         run: |
