@@ -181,10 +181,10 @@ function InfoIcon() {
 }
 export function OrderTracker({ order }: { order: Order }) {
   const { t, lang } = useI18n();
-  const isItin = order.product.startsWith("itin");
+  const isItin = order.product.startsWith("itin") || order.product.startsWith("bundle");
   const isReturn = order.product === "itin_return";
-  const codes = isItin ? (isReturn ? itinReturnCodes : itinCodes) : llcCodes;
-  const labels = isItin
+  const codes = order.product.startsWith("itin") ? (isReturn ? itinReturnCodes : itinCodes) : llcCodes;
+  const labels = order.product.startsWith("itin")
     ? isReturn
       ? [lang === "ru" ? "Документы" : "Documents", lang === "ru" ? "Подготовка декларации" : "Tax return preparation", lang === "ru" ? "Подписано клиентом" : "Signed by client", ...t.itinStatuses.slice(1)]
       : t.itinStatuses
@@ -222,13 +222,14 @@ export function OrderTracker({ order }: { order: Order }) {
       </div>
       <div className="button-row"><span className={"badge " + (order.payment_status === "paid" ? "success" : "neutral")}>{paymentLabel}</span>{order.payment_marked_manually && <span className="fineprint">{lang === "ru" ? "Оплата отмечена вручную" : "Payment marked manually"}</span>}</div>
       {order.eligibility === "rejected" && <p className="notice" role="alert">{lang === "ru" ? "ITIN отклонён" : "ITIN rejected"}{order.eligibility_note ? ": " + order.eligibility_note : ""}</p>}
-      {order.eligibility === "pending" && (order.product.startsWith("itin") || order.product.startsWith("bundle")) && <p className="notice">{lang === "ru" ? "Основание ITIN проверяет специалист. Оплата запрашивается только после подтверждения." : "A specialist is reviewing your ITIN eligibility. Payment is requested only after approval."}</p>}
-      {itinInfo && <p className="notice">{lang === "ru" ? "Номер ITIN подтверждён специалистом: " : "ITIN approved by a specialist: "}<b>{itinInfo.itin}</b>{itinInfo.assigned_on && <span> · {lang === "ru" ? "присвоен" : "assigned"} {new Date(itinInfo.assigned_on + "T12:00:00").toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US")}</span>}</p>}
+      {order.eligibility === "pending" && isItin && <p className="notice">{order.product.startsWith("bundle") ? (lang === "ru" ? "Пакет оплачивается сразу. Если основание ITIN не подтвердится, вернём $100; LLC и EIN продолжим оформлять." : "The bundle is paid upfront. If the ITIN basis is not confirmed, we refund $100 and continue the LLC and EIN work.") : (lang === "ru" ? "Основание ITIN проверяет специалист. Оплата — после подтверждения." : "A specialist is reviewing your ITIN eligibility. Payment is due after approval.")}</p>}
+      {(order.itin_attempt || 1)>1 && <p className="notice">{lang==="ru" ? `Повторная подача, попытка ${order.itin_attempt} (бесплатно)` : `Resubmission, attempt ${order.itin_attempt} (free)`}</p>}
+      {itinInfo && <p className="notice">{lang === "ru" ? "Ваш ITIN: " : "Your ITIN: "}<b>{itinInfo.itin}</b>{itinInfo.assigned_on && <span> · {lang === "ru" ? "присвоен" : "assigned"} {new Date(itinInfo.assigned_on + "T12:00:00").toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US")}</span>}</p>}
       {irsEvents.map(event => <p className="notice" key={event.id}>
         {event.kind === "request"
-          ? (lang === "ru" ? "IRS запросил дополнительные сведения: " : "The IRS requested additional information: ")
-          : (lang === "ru" ? "IRS отказал в этой попытке. Мы готовим бесплатную повторную подачу: " : "The IRS rejected this attempt. We are preparing a free resubmission: ")}
-        {event.note} · {lang === "ru" ? "попытка" : "attempt"} {event.attempt}
+          ? (lang === "ru" ? "IRS запросил дополнительные документы: " : "The IRS requested additional documents: ")
+          : (lang === "ru" ? "IRS отказал: " : "The IRS rejected the application: ")}
+        {event.note}{event.kind==="rejection" && (lang==="ru" ? `. Готовим повторную подачу бесплатно (попытка ${event.attempt+1})` : `. We are preparing a free resubmission (attempt ${event.attempt+1})`)}
       </p>)}
       <ol className="timeline">
         {codes.map((s, i) => {
