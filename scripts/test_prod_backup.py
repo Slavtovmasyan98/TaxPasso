@@ -16,7 +16,7 @@ class BackupGuards(unittest.TestCase):
             home.mkdir(mode=0o700)
             env = {"RUNNER_TEMP": folder, "GNUPGHOME": str(home),
                    "DB_URL": "postgresql://postgres:test@db.mhjxjxteorjwkvqbznfl.supabase.co:5432/postgres",
-                   "BACKUP_PASSPHRASE": "test-only-backup-passphrase-12345"}
+                   "PROD_BACKUP_PASSPHRASE": "test-only-backup-passphrase-12345"}
 
             def fake_database(command, **kwargs):
                 if command[0] == "psql":
@@ -42,6 +42,12 @@ class BackupGuards(unittest.TestCase):
 
     def test_dump_failure_stops_and_removes_plaintext(self):
         self.run_backup(fail_dump=True)
+
+    def test_passphrase_rejects_crlf_and_surrounding_whitespace(self):
+        base = {"RUNNER_TEMP": "/tmp", "DB_URL": "postgresql://postgres:test@db.mhjxjxteorjwkvqbznfl.supabase.co:5432/postgres"}
+        for value in ("x" * 23, " " + "x" * 32, "x" * 32 + " ", "x" * 32 + "\n", "x" * 32 + "\r"):
+            with self.subTest(value=repr(value)), patch.dict(os.environ, {**base, "PROD_BACKUP_PASSPHRASE": value}, clear=True), self.assertRaises(SystemExit):
+                backup()
 
 
 if __name__ == "__main__":
