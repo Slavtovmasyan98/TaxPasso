@@ -1,0 +1,100 @@
+name: prod-db
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: "Full SHA of the release tested on staging (migration source)"
+        required: true
+        default: "9882562f7c169e8583228755768580e19accfb99"
+      dry_run_only:
+        description: "Only preview schema migrations; history repair is a separate explicit option"
+        type: boolean
+        default: true
+      repair_history:
+        description: "One-time JOURNAL WRITE: rename timestamp history to 001–010; requires REPAIR"
+        type: boolean
+        default: false
+      confirm:
+        description: "CHECK for preview, REPAIR for history repair + preview, APPLY for schema changes"
+        required: true
+        default: "CHECK"
+
+permissions:
+  contents: read
+concurrency:
+  group: production-database
+  cancel-in-progress: false
+
+jobs:
+  push-migrations:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      DB_URL: ${{ secrets.PROD_DB_URL }}
+      REF_NAME: ${{ github.ref_name }}
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      DRY_RUN_ONLY: ${{ inputs.dry_run_only }}
+      REPAIR_HISTORY: ${{ inputs.repair_history }}
+      CONFIRM: ${{ inputs.confirm }}
+      PGSSLMODE: require
+      PGCONNECT_TIMEOUT: '15'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      # The workflow is on main BEFORE the release UI is merged.
+      # Only SQL files from this immutable candidate are copied; its scripts are never run.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha }}
+          path: migration-source
+          persist-credentials: false
+      - name: Validate production destination, inputs and migration source
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_*.py'
+          python3 scripts/prod_migrations.py source
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+          github-token: ${{ github.token }}
+      - name: Verify CLI and PostgreSQL client
+        run: |
+          supabase --version
+          supabase migration repair --help
+          supabase db push --help
+          psql --version
+      - name: Prepare isolated migration directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/prod-migrations/supabase/migrations"
+          cp migration-source/supabase/migrations/*.sql "$RUNNER_TEMP/prod-migrations/supabase/migrations/"
+          cd "$RUNNER_TEMP/prod-migrations"
+          supabase init
+      - name: Validate current production history
+        id: history
+        run: python3 scripts/prod_migrations.py before
+      - name: One-time history repair (no schema migrations)
+        if: steps.history.outputs.needs_repair == 'true'
+        run: |
+          cd "$RUNNER_TEMP/prod-migrations"
+          supabase migration repair --db-url "$DB_URL" --status reverted \
+            20260924234059 20260924234142 20260924234152 20260924234214 20260925050905 \
+            20260925053603 20260926000827 20260926011259 20260926013300 20260926015111
+          supabase migration repair --db-url "$DB_URL" --status applied \
+            001 002 003 004 005 006 007 008 009 010
+      - name: Guard pending versions (only 011–015)
+        run: python3 scripts/prod_migrations.py pending
+      - name: Dry run — review before a separate APPLY dispatch
+        run: |
+          cd "$RUNNER_TEMP/prod-migrations"
+          supabase db push --db-url "$DB_URL" --dry-run
+      - name: Apply migrations
+        if: ${{ !inputs.dry_run_only }}
+        run: |
+          python3 scripts/prod_migrations.py pending
+          cd "$RUNNER_TEMP/prod-migrations"
+          supabase db push --db-url "$DB_URL" --yes
+      - name: Verify applied history
+        if: ${{ !inputs.dry_run_only }}
+        run: python3 scripts/prod_migrations.py after
