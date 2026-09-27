@@ -4,6 +4,7 @@ import {
   NavLink,
   Outlet,
   Navigate,
+  useLocation,
   useOutletContext,
 } from "react-router-dom";
 import {
@@ -41,6 +42,14 @@ export const itinCodes = [
   "sent_irs",
   "itin_received",
 ];
+export const itinReturnCodes = [
+  "documents",
+  "return_prep",
+  "client_signed",
+  "caa_interview",
+  "sent_irs",
+  "itin_received",
+];
 const sample: Order = {
   id: "demo-order",
   product: "llc_wy",
@@ -58,6 +67,7 @@ const sample: Order = {
 };
 type AppContext = { orders: Order[]; refresh: () => void; role: string };
 export function AppLayout() {
+  const location = useLocation();
   const { t, lang } = useI18n();
   const { session, loading, role } = useAuth();
   const [orders, setOrders] = useState<Order[]>(demoMode ? [sample] : []);
@@ -92,7 +102,7 @@ export function AppLayout() {
     };
   }, [session]);
   if (loading) return <p className="container page">{t.loading}</p>;
-  if (!demoMode && !session) return <Navigate to="/login" replace />;
+  if (!demoMode && !session) return <Navigate to={"/login?next=" + encodeURIComponent(location.pathname + location.search)} replace />;
   // Кабинет партнёра — только в Taxpasso Partners. Клиентский сайт для партнёров закрыт.
   if (role === "partner") {
     return (
@@ -171,10 +181,44 @@ function InfoIcon() {
 }
 export function OrderTracker({ order }: { order: Order }) {
   const { t, lang } = useI18n();
-  const isItin = order.product.startsWith("itin");
-  const codes = isItin ? itinCodes : llcCodes;
-  const labels = isItin ? t.itinStatuses : t.llcStatuses;
+  const isItin = order.product.startsWith("itin") || order.product.startsWith("bundle");
+  // Bundles render a second tracker for ITIN; keep IRS details in that tracker only.
+  const showItinDetails = order.product.startsWith("itin");
+  const isReturn = order.product === "itin_return";
+  const codes = order.product.startsWith("itin") ? (isReturn ? itinReturnCodes : itinCodes) : llcCodes;
+  const labels = order.product.startsWith("itin")
+    ? isReturn
+      ? [lang === "ru" ? "Документы" : "Documents", lang === "ru" ? "Подготовка декларации" : "Tax return preparation", lang === "ru" ? "Подписано клиентом" : "Signed by client", ...t.itinStatuses.slice(1)]
+      : t.itinStatuses
+    : t.llcStatuses;
   const current = codes.indexOf(order.status);
+  const [itinInfo, setItinInfo] = useState<{ itin: string; assigned_on: string | null } | null>(null);
+  const [irsEvents, setIrsEvents] = useState<{ id: string; kind: string; note: string; attempt: number; created_at: string }[]>([]);
+  useEffect(() => {
+    if (!supabase || !showItinDetails) return;
+    let active = true;
+    const load = () => {
+      if (document.visibilityState === "hidden") return;
+      Promise.all([
+        supabase!.from("order_itin").select("itin,assigned_on").eq("order_id", order.id).maybeSingle(),
+        supabase!.from("itin_irs_events").select("id,kind,note,attempt,created_at").eq("order_id", order.id).order("created_at", { ascending: false }),
+      ]).then(([itin, events]) => {
+        if (!active) return;
+        if (!itin.error) setItinInfo(itin.data || null);
+        if (!events.error) setIrsEvents(events.data || []);
+      });
+    };
+    load();
+    window.addEventListener("focus", load);
+    document.addEventListener("visibilitychange", load);
+    const interval = window.setInterval(load, 30_000);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", load);
+      document.removeEventListener("visibilitychange", load);
+      window.clearInterval(interval);
+    };
+  }, [order.id, showItinDetails]);
   const paymentLabel = order.payment_status === "paid" ? (lang === "ru" ? "Оплачено" : "Paid") : (lang === "ru" ? "Ожидает оплаты" : "Awaiting payment");
   return (
     <article className="panel tracker">
@@ -192,7 +236,15 @@ export function OrderTracker({ order }: { order: Order }) {
       </div>
       <div className="button-row"><span className={"badge " + (order.payment_status === "paid" ? "success" : "neutral")}>{paymentLabel}</span>{order.payment_marked_manually && <span className="fineprint">{lang === "ru" ? "Оплата отмечена вручную" : "Payment marked manually"}</span>}</div>
       {order.eligibility === "rejected" && <p className="notice" role="alert">{lang === "ru" ? "ITIN отклонён" : "ITIN rejected"}{order.eligibility_note ? ": " + order.eligibility_note : ""}</p>}
-      {order.eligibility === "pending" && (order.product.startsWith("itin") || order.product.startsWith("bundle")) && <p className="notice">{lang === "ru" ? "ITIN на проверке партнёром" : "ITIN under partner review"}</p>}
+      {order.eligibility === "pending" && isItin && <p className="notice">{order.product.startsWith("bundle") ? (lang === "ru" ? "Пакет оплачивается сразу. Если основание ITIN не подтвердится, вернём $100; LLC и EIN продолжим оформлять." : "The bundle is paid upfront. If the ITIN basis is not confirmed, we refund $100 and continue the LLC and EIN work.") : (lang === "ru" ? "Основание ITIN проверяет специалист. Оплата — после подтверждения." : "A specialist is reviewing your ITIN eligibility. Payment is due after approval.")}</p>}
+      {(order.itin_attempt || 1)>1 && <p className="notice">{lang==="ru" ? `Повторная подача, попытка ${order.itin_attempt} (бесплатно)` : `Resubmission, attempt ${order.itin_attempt} (free)`}</p>}
+      {itinInfo && <p className="notice">{lang === "ru" ? "Ваш ITIN: " : "Your ITIN: "}<b>{itinInfo.itin}</b>{itinInfo.assigned_on && <span> · {lang === "ru" ? "присвоен" : "assigned"} {new Date(itinInfo.assigned_on + "T12:00:00").toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US")}</span>}</p>}
+      {irsEvents.map(event => <p className="notice" key={event.id}>
+        {event.kind === "request"
+          ? (lang === "ru" ? "IRS запросил дополнительные документы: " : "The IRS requested additional documents: ")
+          : (lang === "ru" ? "IRS отказал: " : "The IRS rejected the application: ")}
+        {event.note}{event.kind==="rejection" && (lang==="ru" ? `. Готовим повторную подачу бесплатно (попытка ${event.attempt+1})` : `. We are preparing a free resubmission (attempt ${event.attempt+1})`)}
+      </p>)}
       <ol className="timeline">
         {codes.map((s, i) => {
           const history = order.order_status_history?.find(
@@ -248,6 +300,18 @@ export function Dashboard() {
   const { orders, role, refresh } = useOutletContext<AppContext>();
   const [msg, setMsg] = useState("");
   // Карточки зарегистрированных компаний (заполняет партнёр/админ после регистрации)
+  // Возвраты по заказам клиента (фиксирует администратор)
+  const [refunds, setRefunds] = useState<
+    { id: string; order_id: string; amount_cents: number; scope: string; reason: string; created_at: string }[]
+  >([]);
+  useEffect(() => {
+    if (!supabase) return;
+    supabase
+      .from("order_refunds")
+      .select("id,order_id,amount_cents,scope,reason,created_at")
+      .order("created_at")
+      .then(({ data }) => setRefunds(data || []));
+  }, [orders.length]);
   const [companies, setCompanies] = useState<
     { order_id: string; name: string; state: string; ein: string | null; registered_on: string | null }[]
   >([]);
@@ -331,6 +395,23 @@ export function Dashboard() {
       ) : (
         orders.map((o) => (
           <div key={o.id}>
+            {(() => {
+              const x = o as unknown as { cancelled_at?: string | null; cancel_reason?: string | null };
+              return x.cancelled_at ? (
+                <p className="notice">
+                  <LockKeyhole size={16} />
+                  {lang === "ru" ? "Заказ отменён" : "Order cancelled"}{" "}
+                  {new Date(x.cancelled_at).toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US")}
+                  {x.cancel_reason ? ` · ${x.cancel_reason}` : ""}
+                </p>
+              ) : null;
+            })()}
+            {refunds.filter((r) => r.order_id === o.id).map((r) => (
+              <p className="notice" key={r.id}>
+                {lang === "ru" ? "Возврат" : "Refund"} ${(r.amount_cents / 100).toFixed(2)} ·{" "}
+                {new Date(r.created_at).toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US")} · {r.reason}
+              </p>
+            ))}
             <OrderTracker order={o} />
             {o.itin_status && (
               <OrderTracker
@@ -440,6 +521,7 @@ export function Documents() {
     const { data, error } = await supabase
       .from("documents")
       .select("*")
+      .is("superseded_at", null)
       .order("created_at", { ascending: false });
     if (error) setMsg(t.error);
     else setDocs(data || []);
@@ -453,6 +535,37 @@ export function Documents() {
   useEffect(() => {
     load();
   }, []);
+  // Новая версия отклонённого документа: тот же заказ, тот же тип, старая версия помечается заменённой.
+  async function replaceDocument(prev: Doc, file: File) {
+    if (!supabase) return;
+    if (file.size > 10 * 1024 * 1024 || !["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
+      setMsg("PDF, JPG, PNG ≤ 10 MB");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw Error("Sign in");
+      const ext = file.type === "application/pdf" ? "pdf" : file.type === "image/png" ? "png" : "jpg";
+      const path = `${prev.order_id}/${crypto.randomUUID()}.${ext}`;
+      const up = await supabase.storage.from("documents").upload(path, file, { contentType: file.type, upsert: false });
+      if (up.error) throw up.error;
+      const { error } = await supabase.from("documents").insert({
+        order_id: prev.order_id, uploaded_by: user.id, path, name: file.name,
+        mime_type: file.type, size_bytes: file.size, replaces_document_id: prev.id,
+      });
+      if (error) {
+        await supabase.storage.from("documents").remove([path]);
+        throw error;
+      }
+      await load();
+      setMsg(lang === "ru" ? "Новая версия загружена и отправлена на проверку" : "New version uploaded for review");
+    } catch {
+      setMsg(t.error);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function upload(file?: File) {
     if (!file || !orderId) return;
     setBusy(true);
@@ -573,7 +686,22 @@ export function Documents() {
               {t.download}
               <ArrowUpRight size={16} />
             </Button></div>
-            {d.review_status === "rejected" && <Button variant="outline" onClick={() => { setOrderId(d.order_id); document.getElementById("document-upload")?.click(); }}>{lang === "ru" ? "Загрузить заново" : "Upload again"}</Button>}
+            {d.review_status === "rejected" && (
+              <label className="btn btn-outline" style={{ cursor: "pointer" }}>
+                {lang === "ru" ? "Загрузить заново" : "Upload again"}
+                <input
+                  type="file"
+                  hidden
+                  accept="application/pdf,image/jpeg,image/png"
+                  disabled={busy}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) replaceDocument(d, f);
+                  }}
+                />
+              </label>
+            )}
             <span className="fineprint">{d.review_status === "accepted" ? (lang === "ru" ? "Принят" : "Accepted") : d.review_status === "rejected" ? (lang === "ru" ? "Отклонён" : "Rejected") : (lang === "ru" ? "На проверке" : "Under review")}{d.review_comment ? ` · ${d.review_comment}` : ""}</span>
           </div>
         ))
