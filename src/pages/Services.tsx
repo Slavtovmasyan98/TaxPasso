@@ -238,10 +238,10 @@ export function ITINQuiz() {
             {outcome.note && <p className="muted">{outcome.note}</p>}
             <p className="muted">
               {outcome.product.startsWith("bundle")
-                ? T("Перед оплатой специалист Taxpasso предварительно проверит основание для ITIN. Если он его не подтвердит, пакет не оплачивается — вы сможете оформить только LLC + EIN. Решение IRS по ITIN мы гарантировать не можем; возвраты — по политике возврата.",
-                    "Before payment, a Taxpasso specialist pre-checks the ITIN basis. If they don't confirm it, the bundle isn't charged — you can order LLC + EIN only. We can't guarantee the IRS decision; refunds follow our refund policy.")
-                : T("Перед оплатой специалист Taxpasso предварительно проверит основание. Если он его не подтвердит, заказ не оплачивается. Решение IRS мы гарантировать не можем; возвраты — по политике возврата.",
-                    "Before payment, a Taxpasso specialist pre-checks the basis. If they don't confirm it, the order isn't charged. We can't guarantee the IRS decision; refunds follow our refund policy.")}
+                ? T("Пакет оплачивается сразу. Если специалист не подтвердит основание для ITIN, вернём $100, а LLC и EIN оформим как обычно.",
+                    "The bundle is paid upfront. If a specialist does not confirm the ITIN basis, we will refund $100 and continue the LLC and EIN work.")
+                : T("Оплата — после того, как специалист Taxpasso подтвердит основание. Если IRS откажет, следующая подача — бесплатно. Решение IRS мы гарантировать не можем.",
+                    "Payment is due after a Taxpasso specialist confirms the basis. If the IRS rejects the application, the next submission is free. We cannot guarantee the IRS decision.")}
             </p>
             <div className="button-row">
               <Button variant="outline" onClick={restart}>{t.back}</Button>

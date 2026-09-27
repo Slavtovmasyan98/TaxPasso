@@ -26,6 +26,7 @@ export type Order = {
   product: string;
   status: string;
   itin_status?: string;
+  itin_attempt?: number;
   created_at: string;
   applicant: Record<string, string>;
   eligibility: string;
