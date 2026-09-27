@@ -93,6 +93,7 @@ export function PricingCards({ full = false }: { full?: boolean }) {
               <ArrowRight size={16} />
             </Link>
           </Button>
+          {(p.id==="itin_standard"||p.id==="itin_return")&&<p className="fineprint">{lang==="ru"?"При отказе IRS — повторная подача бесплатно":"If the IRS rejects the application, the next submission is free"}</p>}
           <div className="price-divider" />
           <span className="eyebrow small">{t.included}</span>
           <ul className="check-list">

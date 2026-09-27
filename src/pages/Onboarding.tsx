@@ -38,10 +38,47 @@ export function Onboarding() {
   const needsGate = itin || product.startsWith("bundle");
   const [submitted, setSubmitted] = useState(false);
   const countries = useMemo(() => countryList(lang), [lang]);
+  // Ответы опросника ITIN — сохраняются в анкете, чтобы специалист видел их в заказе.
+  const quiz: Record<string, string> = {};
+  const qs = params.get("quiz_ssn");
+  const qb = params.get("quiz_basis");
+  if (qs && ["no", "unsure"].includes(qs)) quiz.quiz_ssn = qs;
+  if (qb && ["prepare_return", "return_ready", "irs_exception", "unknown", "none"].includes(qb)) quiz.quiz_basis = qb;
+
+  // Возвращает номер черновика: состояние id обновляется асинхронно и сразу после setId ещё пустое.
+  async function ensureDraft(): Promise<string> {
+    if (id || demoMode) {
+      if (demoMode && !id) setId("demo-new");
+      return id || "demo-new";
+    }
+    if (!supabase || !session) throw new Error("Sign in required");
+    const { data, error } = await supabase
+      .from("orders")
+      .insert({
+        client_id: session.user.id,
+        product,
+        applicant: quiz,
+        status: "draft",
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    setId(data.id);
+    refresh();
+    return data.id as string;
+  }
   async function next() {
     setMessage("");
     if (step === 0) {
-      setStep(1);
+      setBusy(true);
+      try {
+        await ensureDraft();
+        setStep(1);
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : t.error);
+      } finally {
+        setBusy(false);
+      }
       return;
     }
     if (step === 1) {
@@ -61,30 +98,16 @@ export function Onboarding() {
       }
       setBusy(true);
       try {
-        if (!id) {
-          const { data, error } = await supabase!
-            .from("orders")
-            .insert({
-              client_id: session!.user.id,
-              product,
-              applicant: form,
-              status: "draft",
-            })
-            .select("id")
-            .single();
-          if (error) throw error;
-          setId(data.id);
-        } else {
-          const { error } = await supabase!
-            .from("orders")
-            .update({ applicant: form })
-            .eq("id", id);
-          if (error) throw error;
-        }
+        const orderId = await ensureDraft();
+        const { error } = await supabase!
+          .from("orders")
+          .update({ applicant: { ...form, ...quiz } })
+          .eq("id", orderId);
+        if (error) throw error;
         setStep(2);
         refresh();
-      } catch {
-        setMessage(t.error);
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : t.error);
       } finally {
         setBusy(false);
       }

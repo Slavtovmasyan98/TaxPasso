@@ -188,7 +188,7 @@ const en: typeof ru = {
   payment: "Pay with Stripe Checkout",
   paymentNote: "Payments are not connected yet. You will not be charged.",
   itinGate:
-    "ITIN and bundles containing ITIN require partner approval of your tax basis before payment.",
+    "ITIN is paid after eligibility is confirmed. Bundles containing ITIN are paid upfront; if the ITIN basis is not confirmed, we refund $100.",
   consent: "I have read the terms and privacy policy",
   required: "Complete all required fields",
   authTitle: "Welcome back to Taxpasso",
@@ -232,7 +232,7 @@ const en: typeof ru = {
   privacyBody:
     "We process contact details, company information and applicant documents to fulfill orders. Access is restricted to the owner, assigned partner and authorized administrator. Documents use private storage and time-limited links. Partners and infrastructure providers may be in other countries. Before launch, the operator must define retention periods, lawful processing grounds, deletion procedures and a data-subject request channel.",
   refundBody:
-    "Refunds are calculated after deducting services already delivered and non-refundable government fees. Before work starts, fees for undelivered services are refundable. After submission, the amount depends on completed work and government rules. Bank or IRS rejection does not automatically entitle a refund for work already performed. Refund requests and calculations are reviewed individually; mandatory consumer rights remain unaffected.",
+    "Draft refund policy, subject to legal review. LLC Wyoming and Delaware are paid upfront and are non-refundable after payment, subject to mandatory consumer rights. LLC + ITIN bundles are paid upfront; if the ITIN basis is not confirmed, we refund $100 for the ITIN portion and continue LLC and EIN work. ITIN Standard and ITIN with tax return preparation are paid only after eligibility is confirmed. If the IRS rejects an ITIN application, the next submission is free. Taxpasso or partner preparation errors are corrected free of charge. IRS decisions are not guaranteed.",
   faqItems: [
     [
       "Can I open an account with Mercury, Relay or Wise?",
@@ -252,7 +252,7 @@ const en: typeof ru = {
     ],
     [
       "Can I get a refund?",
-      "Yes, less services already performed and non-refundable government fees. See the refund policy.",
+      "Refund rules differ by product: the LLC + ITIN bundle includes a $100 ITIN refund if eligibility is not confirmed. See the draft refund policy.",
     ],
     [
       "How is EIN progress tracked?",

@@ -17,5 +17,5 @@ export const GOOGLE_AUTH_ENABLED = import.meta.env.VITE_GOOGLE_AUTH === "true";
 // версия сохраняется вместе с согласием клиента.
 export const LEGAL_VERSIONS = {
   terms: "2026-09-draft",
-  refund: "2026-09-draft",
+  refund: "2026-09-27-draft-013-015",
 } as const;

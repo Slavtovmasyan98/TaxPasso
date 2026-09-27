@@ -89,113 +89,166 @@ export function LLC() {
     </div>
   );
 }
+// Опросник ITIN: 2 вопроса, у каждого ответа — понятный итог и следующий шаг.
+// Итог не подтверждает право на ITIN окончательно: основание проверяет партнёр до оплаты.
+type QuizOutcome =
+  | { kind: "has_ssn" }
+  | { kind: "no_basis" }
+  | { kind: "apply"; product: string; review: boolean; note?: string; alt?: string };
+
+// Коды ответов передаются в анкету, чтобы специалист видел их в заказе.
+const SSN_CODES = ["no", "yes", "unsure"];
+const BASIS_CODES = ["prepare_return", "return_ready", "irs_exception", "unknown", "none"];
+
 export function ITINQuiz() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const ru = lang !== "en";
+  const T = (r: string, e: string) => (ru ? r : e);
   const [params] = useSearchParams();
   const requested = params.get("product");
+  const fromBundle = requested === "bundle_wy" || requested === "bundle_de";
+  // Если пришли из пакета Delaware — LLC тоже предлагаем в Delaware.
+  const llcProduct = requested === "bundle_de" ? "llc_de" : "llc_wy";
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState(["", "", "", ""]);
-  const [result, setResult] = useState(false);
-  const choices = [
-    [t.no, t.yes, t.unsure],
-    t.basisOptions,
-    [t.yes, t.no, t.unsure],
-    t.countries,
+  const [ssn, setSsn] = useState("");
+  const [basis, setBasis] = useState("");
+  const [outcome, setOutcome] = useState<QuizOutcome | null>(null);
+
+  const questions = [
+    {
+      q: T("Есть ли у вас номер SSN или право на него?", "Do you have an SSN or are you eligible for one?"),
+      hint: T("SSN — номер социального страхования США. Его выдают, например, при праве на работу в США. Если у вас есть SSN или право на него, IRS не принимает заявление на ITIN (W-7).",
+              "An SSN is a US Social Security Number, issued for example to people authorised to work in the US. If you have an SSN or are eligible for one, the IRS does not accept an ITIN application (W-7)."),
+      options: [T("Нет", "No"), T("Да, есть SSN или право на него", "Yes, I have one or I'm eligible"), T("Не уверен(а)", "Not sure")],
+      value: ssn, set: setSsn,
+    },
+    {
+      q: T("Зачем вам ITIN? Есть ли налоговая причина?", "Why do you need an ITIN? Is there a tax reason?"),
+      hint: T("ITIN выдают при налоговой причине: чаще всего — обязанность подать налоговую декларацию США. Реже — одно из исключений IRS с подтверждающими документами. Обычная просьба банка «предоставить ITIN» сама по себе не является основанием.",
+              "An ITIN is issued for a tax reason: most often a requirement to file a US tax return, less often one of the IRS exceptions backed by supporting documents. A bank simply asking for an ITIN is not a reason on its own."),
+      options: [
+        T("Нужно подать налоговую декларацию США, и её нужно подготовить", "I must file a US tax return and need it prepared"),
+        T("Налоговая декларация уже готова", "My tax return is already prepared"),
+        T("Подхожу под исключение IRS и есть подтверждающие документы", "I qualify for an IRS exception and have supporting documents"),
+        T("Не знаю", "I don't know"),
+        T("Налоговой причины, похоже, нет", "There seems to be no tax reason"),
+      ],
+      value: basis, set: setBasis,
+    },
   ];
-  const eligible = answers[0] === "0" && ["0", "1", "2"].includes(answers[1]);
+
+  function decide(): QuizOutcome {
+    if (ssn === "1") return { kind: "has_ssn" };
+    if (basis === "4") return { kind: "no_basis" };
+    const review = ssn === "2" || basis === "3";
+    const formNote = T("Это предварительная рекомендация: налоговый статус и нужную форму декларации (1040-NR или 1040) подтвердит специалист.",
+                       "This is a preliminary recommendation: a specialist will confirm your tax status and the right return form (1040-NR or 1040).");
+    if (basis === "0") {
+      return fromBundle
+        ? { kind: "apply", product: requested!, review, alt: "itin_return",
+            note: T("В пакет входит ITIN Standard без подготовки декларации. Если декларацию нужно подготовить, выберите «ITIN + подготовка декларации» отдельно.",
+                    "The bundle includes ITIN Standard without tax return preparation. If you need a return prepared, choose “ITIN + tax return” separately.") }
+        : { kind: "apply", product: "itin_return", review, note: formNote };
+    }
+    if (basis === "3") {
+      return { kind: "apply", product: fromBundle ? requested! : "itin_standard", review: true,
+               note: T("Сначала специалист проверит, есть ли основание. Тариф предварительный: если понадобится подготовка декларации, предложим «ITIN + подготовка декларации».",
+                       "First a specialist checks whether there is a basis. The plan is preliminary: if a return must be prepared, we'll offer “ITIN + tax return”.") };
+    }
+    return { kind: "apply", product: fromBundle ? requested! : "itin_standard", review };
+  }
+
+  function next() {
+    if (step === 0 && ssn === "1") { setOutcome({ kind: "has_ssn" }); return; }
+    if (step < questions.length - 1) { setStep(step + 1); return; }
+    setOutcome(decide());
+  }
+  function restart() { setOutcome(null); setStep(0); setSsn(""); setBasis(""); }
+  // Ссылка в анкету с ответами опросника
+  const applyLink = (product: string, basisCode = BASIS_CODES[Number(basis)] || "") =>
+    `/app/new?product=${product}&quiz_ssn=${SSN_CODES[Number(ssn)] || ""}&quiz_basis=${basisCode}`;
+
+  const productName = (id: string) =>
+    ({ itin_standard: "ITIN Standard · $259", itin_return: T("ITIN + подготовка декларации · $400", "ITIN + tax return · $400"),
+       bundle_wy: T("Старт в США · WY · $549", "US Launch · WY · $549"), bundle_de: T("Старт в США · DE · $649", "US Launch · DE · $649") } as Record<string, string>)[id] || id;
+
+  const cur = questions[step];
   return (
     <section className="quiz panel" id="quiz">
       <div>
         <span className="eyebrow">ITIN / ELIGIBILITY</span>
         <h2>{t.quizTitle}</h2>
-        <p className="muted">{t.quizSub}</p>
+        <p className="muted">{T("2 вопроса до оплаты. Итог подтверждает специалист, а не автоматический опрос.",
+                                "2 questions before payment. A specialist confirms the outcome, not an automated quiz.")}</p>
         <div className="quiz-progress">
-          {[0, 1, 2, 3].map((x) => (
-            <span key={x} className={x <= step ? "filled" : ""} />
-          ))}
+          {questions.map((_, x) => <span key={x} className={x <= step || outcome ? "filled" : ""} />)}
         </div>
       </div>
       <div>
-        {!result ? (
+        {!outcome ? (
           <>
-            <span className="eyebrow">0{step + 1} / 04</span>
-            <h3>{t.quizQuestions[step]}</h3>
+            <span className="eyebrow">0{step + 1} / 0{questions.length}</span>
+            <h3>{cur.q}</h3>
+            <p className="muted" style={{ fontSize: 14 }}>{cur.hint}</p>
             <div className="quiz-options">
-              {choices[step].map((c, i) => (
-                <label
-                  className={answers[step] === String(i) ? "chosen" : ""}
-                  key={c}
-                >
-                  <input
-                    type="radio"
-                    name={"q" + step}
-                    value={i}
-                    checked={answers[step] === String(i)}
-                    onChange={() =>
-                      setAnswers((a) =>
-                        a.map((v, n) => (n === step ? String(i) : v)),
-                      )
-                    }
-                  />
+              {cur.options.map((c, i) => (
+                <label className={cur.value === String(i) ? "chosen" : ""} key={c}>
+                  <input type="radio" name={"q" + step} value={i} checked={cur.value === String(i)}
+                    onChange={() => cur.set(String(i))} />
                   {c}
                 </label>
               ))}
             </div>
             <div className="button-row">
-              {step > 0 && (
-                <Button variant="ghost" onClick={() => setStep(step - 1)}>
-                  {t.back}
-                </Button>
-              )}
-              <Button
-                disabled={!answers[step]}
-                onClick={() =>
-                  step === 3 ? setResult(true) : setStep(step + 1)
-                }
-              >
-                {step === 3 ? t.check : t.next}
+              {step > 0 && <Button variant="ghost" onClick={() => setStep(step - 1)}>{t.back}</Button>}
+              <Button disabled={!cur.value} onClick={next}>
+                {step === questions.length - 1 || (step === 0 && ssn === "1") ? t.check : t.next}
                 <ArrowRight size={17} />
               </Button>
+            </div>
+          </>
+        ) : outcome.kind === "has_ssn" ? (
+          <>
+            <ShieldCheck size={34} />
+            <h3>{T("ITIN вам не нужен", "You don't need an ITIN")}</h3>
+            <p>{T("IRS не принимает заявление на ITIN, если у вас есть SSN или право на него. Если право есть, но номер ещё не получен, обратитесь за SSN в Social Security Administration. Компанию и EIN можно оформить с SSN, без ITIN.",
+                  "The IRS does not accept an ITIN application if you have an SSN or are eligible for one. If you are eligible but have not received it yet, apply for an SSN with the Social Security Administration. You can form a company and get an EIN with an SSN, without an ITIN.")}</p>
+            <div className="button-row">
+              <Button variant="outline" onClick={restart}>{t.back}</Button>
+              <Button asChild><Link to={`/app/new?product=${llcProduct}`}>{T("Открыть LLC + EIN", "Form an LLC + EIN")}</Link></Button>
+            </div>
+          </>
+        ) : outcome.kind === "no_basis" ? (
+          <>
+            <Info size={34} />
+            <h3>{T("По вашим ответам основание для ITIN не видно", "Your answers don't show a basis for an ITIN")}</h3>
+            <p>{T("Это предварительный вывод. IRS выдаёт ITIN только при налоговой причине. LLC и EIN можно оформить без ITIN. Если вы не уверены, специалист проверит основание бесплатно, до оплаты.",
+                  "This is a preliminary conclusion. The IRS issues an ITIN only for a tax reason. You can form an LLC and get an EIN without an ITIN. If you're unsure, a specialist will check the basis free of charge, before payment.")}</p>
+            <div className="button-row">
+              <Button variant="outline" onClick={restart}>{t.back}</Button>
+              <Button variant="outline" asChild><Link to={applyLink(fromBundle ? requested! : "itin_standard", "none")}>{T("Проверить у специалиста", "Ask a specialist to check")}</Link></Button>
+              <Button asChild><Link to={`/app/new?product=${llcProduct}`}>{T("Открыть LLC + EIN", "Form an LLC + EIN")}</Link></Button>
             </div>
           </>
         ) : (
           <>
             <ShieldCheck size={34} />
-            <h3>
-              {answers[0] === "1"
-                ? t.quizBlocked
-                : eligible
-                  ? t.quizEligible
-                  : t.quizReview}
-            </h3>
-            <p>{t.quizResult}</p>
-            <p className="muted">{t.multiNote}</p>
+            <h3>{outcome.review ? t.quizReview : t.quizEligible}</h3>
+            <p><b>{T("Подходящий пакет: ", "Suggested package: ")}</b>{productName(outcome.product)}</p>
+            {outcome.note && <p className="muted">{outcome.note}</p>}
+            <p className="muted">
+              {outcome.product.startsWith("bundle")
+                ? T("Пакет оплачивается сразу. Если специалист не подтвердит основание для ITIN, вернём $100, а LLC и EIN оформим как обычно.",
+                    "The bundle is paid upfront. If a specialist does not confirm the ITIN basis, we will refund $100 and continue the LLC and EIN work.")
+                : T("Оплата — после того, как специалист Taxpasso подтвердит основание. Если IRS откажет, следующая подача — бесплатно. Решение IRS мы гарантировать не можем.",
+                    "Payment is due after a Taxpasso specialist confirms the basis. If the IRS rejects the application, the next submission is free. We cannot guarantee the IRS decision.")}
+            </p>
             <div className="button-row">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setResult(false);
-                  setStep(0);
-                }}
-              >
-                {t.back}
-              </Button>
-              {answers[0] !== "1" && (
-                <Button asChild>
-                  <Link
-                    to={
-                      "/app/new?product=" +
-                      (["bundle_wy", "bundle_de"].includes(requested || "")
-                        ? requested
-                        : answers[1] === "2"
-                          ? "itin_return"
-                          : "itin_standard")
-                    }
-                  >
-                    {t.apply}
-                  </Link>
-                </Button>
+              <Button variant="outline" onClick={restart}>{t.back}</Button>
+              {outcome.alt && (
+                <Button variant="outline" asChild><Link to={applyLink(outcome.alt)}>{productName(outcome.alt)}</Link></Button>
               )}
+              <Button asChild><Link to={applyLink(outcome.product)}>{outcome.review ? T("Отправить на проверку основания", "Send for basis check") : t.apply}</Link></Button>
             </div>
           </>
         )}
