@@ -239,7 +239,8 @@ test("отмена: только до подачи (учитывая прогр�
 
 test("пакет LLC+ITIN: отказ по ITIN останавливает только ITIN", { skip }, async () => {
   const b = await newPaidAssignedOrder("bundle_wy");
-  assert.equal(await rpc(partner, "reject_eligibility", { p_order: b, p_reason: "нет налогового основания" }), null);
+  assert.equal((await partner.c.rpc("propose_eligibility", { p_order: b, p_decision: "reject", p_reason: "нет налогового основания", p_op: op() })).error, null);
+  assert.equal((await adm.c.rpc("confirm_eligibility", { p_order: b, p_op: op() })).error, null);
   assert.notEqual(err(await propose(partner, b, "caa_interview", "itin")), null);
   assert.equal(err(await propose(partner, b, "review")), null, "LLC продолжается");
   const row = await client.c.from("orders").select("eligibility,eligibility_note,closed_at").eq("id", b).single();
