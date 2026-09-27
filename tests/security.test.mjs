@@ -289,8 +289,8 @@ test("повторная загрузка заменяет отклонённы�
   assert.ok(old.data.superseded_at, "старая версия помечена как заменённая");
 });
 
-test("оплата заказа с ITIN невозможна до одобрения основания", { skip }, async () => {
-  for (const product of ["itin_standard", "itin_return", "bundle_wy", "bundle_de"]) {
+test("оплата ITIN требует одобрения, пакет LLC+ITIN оплачивается сразу", { skip }, async () => {
+  for (const product of ["itin_standard", "itin_return"]) {
     const { data, error } = await client.c.from("orders").insert({
       client_id: client.id, product, status: "draft",
       applicant: { name: "QA", country: "AM", company: "QA LLC", activity: "IT", quiz_ssn: "no", quiz_basis: "unknown" },
@@ -303,5 +303,20 @@ test("оплата заказа с ITIN невозможна до одобрен
     assert.match(await rpc(adm, "mark_order_paid_manually", { p_order: data.id, p_note: "x" }) ?? "", /Eligibility approval required/, product);
     assert.equal(await rpc(adm, "approve_eligibility", { p_order: data.id }), null);
     assert.equal(await rpc(adm, "mark_order_paid_manually", { p_order: data.id, p_note: "x" }), null, product);
+  }
+
+  for (const product of ["bundle_wy", "bundle_de"]) {
+    const { data, error } = await client.c.from("orders").insert({
+      client_id: client.id, product, status: "draft",
+      applicant: { name: "QA", country: "AM", company: "QA LLC", activity: "IT", quiz_ssn: "no", quiz_basis: "unknown" },
+    }).select("id").single();
+    assert.equal(error, null);
+    assert.equal(await rpc(client, "record_consent", { p_order: data.id, p_terms_version: "qa", p_refund_version: "qa" }), null);
+    assert.equal(await rpc(client, "submit_order", { p_order: data.id }), null);
+    assert.equal(await rpc(adm, "mark_order_paid_manually", { p_order: data.id, p_note: "bundle paid before ITIN decision" }), null, product);
+    assert.equal(await rpc(adm, "reject_eligibility", { p_order: data.id, p_reason: "QA no basis" }), null);
+    const row = await client.c.from("orders").select("payment_status,eligibility").eq("id", data.id).single();
+    assert.equal(row.data.payment_status, "paid", product);
+    assert.equal(row.data.eligibility, "rejected", product);
   }
 });
