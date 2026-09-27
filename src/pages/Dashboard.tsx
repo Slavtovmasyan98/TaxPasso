@@ -4,6 +4,7 @@ import {
   NavLink,
   Outlet,
   Navigate,
+  useLocation,
   useOutletContext,
 } from "react-router-dom";
 import {
@@ -58,6 +59,7 @@ const sample: Order = {
 };
 type AppContext = { orders: Order[]; refresh: () => void; role: string };
 export function AppLayout() {
+  const location = useLocation();
   const { t, lang } = useI18n();
   const { session, loading, role } = useAuth();
   const [orders, setOrders] = useState<Order[]>(demoMode ? [sample] : []);
@@ -92,7 +94,7 @@ export function AppLayout() {
     };
   }, [session]);
   if (loading) return <p className="container page">{t.loading}</p>;
-  if (!demoMode && !session) return <Navigate to="/login" replace />;
+  if (!demoMode && !session) return <Navigate to={"/login?next=" + encodeURIComponent(location.pathname + location.search)} replace />;
   // Кабинет партнёра — только в Taxpasso Partners. Клиентский сайт для партнёров закрыт.
   if (role === "partner") {
     return (
