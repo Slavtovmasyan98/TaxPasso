@@ -42,6 +42,14 @@ export const itinCodes = [
   "sent_irs",
   "itin_received",
 ];
+export const itinReturnCodes = [
+  "documents",
+  "return_prep",
+  "client_signed",
+  "caa_interview",
+  "sent_irs",
+  "itin_received",
+];
 const sample: Order = {
   id: "demo-order",
   product: "llc_wy",
@@ -174,9 +182,29 @@ function InfoIcon() {
 export function OrderTracker({ order }: { order: Order }) {
   const { t, lang } = useI18n();
   const isItin = order.product.startsWith("itin");
-  const codes = isItin ? itinCodes : llcCodes;
-  const labels = isItin ? t.itinStatuses : t.llcStatuses;
+  const isReturn = order.product === "itin_return";
+  const codes = isItin ? (isReturn ? itinReturnCodes : itinCodes) : llcCodes;
+  const labels = isItin
+    ? isReturn
+      ? [lang === "ru" ? "Документы" : "Documents", lang === "ru" ? "Подготовка декларации" : "Tax return preparation", lang === "ru" ? "Подписано клиентом" : "Signed by client", ...t.itinStatuses.slice(1)]
+      : t.itinStatuses
+    : t.llcStatuses;
   const current = codes.indexOf(order.status);
+  const [itinInfo, setItinInfo] = useState<{ itin: string; assigned_on: string | null } | null>(null);
+  const [irsEvents, setIrsEvents] = useState<{ id: string; kind: string; note: string; attempt: number; created_at: string }[]>([]);
+  useEffect(() => {
+    if (!supabase || !isItin) return;
+    let active = true;
+    Promise.all([
+      supabase.from("order_itin").select("itin,assigned_on").eq("order_id", order.id).maybeSingle(),
+      supabase.from("itin_irs_events").select("id,kind,note,attempt,created_at").eq("order_id", order.id).order("created_at", { ascending: false }),
+    ]).then(([itin, events]) => {
+      if (!active) return;
+      setItinInfo(itin.data || null);
+      setIrsEvents(events.data || []);
+    });
+    return () => { active = false; };
+  }, [order.id, isItin]);
   const paymentLabel = order.payment_status === "paid" ? (lang === "ru" ? "Оплачено" : "Paid") : (lang === "ru" ? "Ожидает оплаты" : "Awaiting payment");
   return (
     <article className="panel tracker">
@@ -194,7 +222,14 @@ export function OrderTracker({ order }: { order: Order }) {
       </div>
       <div className="button-row"><span className={"badge " + (order.payment_status === "paid" ? "success" : "neutral")}>{paymentLabel}</span>{order.payment_marked_manually && <span className="fineprint">{lang === "ru" ? "Оплата отмечена вручную" : "Payment marked manually"}</span>}</div>
       {order.eligibility === "rejected" && <p className="notice" role="alert">{lang === "ru" ? "ITIN отклонён" : "ITIN rejected"}{order.eligibility_note ? ": " + order.eligibility_note : ""}</p>}
-      {order.eligibility === "pending" && (order.product.startsWith("itin") || order.product.startsWith("bundle")) && <p className="notice">{lang === "ru" ? "ITIN на проверке партнёром" : "ITIN under partner review"}</p>}
+      {order.eligibility === "pending" && (order.product.startsWith("itin") || order.product.startsWith("bundle")) && <p className="notice">{lang === "ru" ? "Основание ITIN проверяет специалист. Оплата запрашивается только после подтверждения." : "A specialist is reviewing your ITIN eligibility. Payment is requested only after approval."}</p>}
+      {itinInfo && <p className="notice">{lang === "ru" ? "Номер ITIN подтверждён специалистом: " : "ITIN approved by a specialist: "}<b>{itinInfo.itin}</b>{itinInfo.assigned_on && <span> · {lang === "ru" ? "присвоен" : "assigned"} {new Date(itinInfo.assigned_on + "T12:00:00").toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US")}</span>}</p>}
+      {irsEvents.map(event => <p className="notice" key={event.id}>
+        {event.kind === "request"
+          ? (lang === "ru" ? "IRS запросил дополнительные сведения: " : "The IRS requested additional information: ")
+          : (lang === "ru" ? "IRS отказал в этой попытке. Мы готовим бесплатную повторную подачу: " : "The IRS rejected this attempt. We are preparing a free resubmission: ")}
+        {event.note} · {lang === "ru" ? "попытка" : "attempt"} {event.attempt}
+      </p>)}
       <ol className="timeline">
         {codes.map((s, i) => {
           const history = order.order_status_history?.find(
