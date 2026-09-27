@@ -45,6 +45,9 @@ async function newPaidAssignedOrder(product = "llc_wy") {
   assert.equal(error, null);
   assert.equal(await rpc(client, "record_consent", { p_order: data.id, p_terms_version: "qa", p_refund_version: "qa" }), null);
   assert.equal(await rpc(client, "submit_order", { p_order: data.id }), null);
+  if (product.startsWith("itin") || product.startsWith("bundle")) {
+    assert.equal(await rpc(adm, "approve_eligibility", { p_order: data.id }), null);
+  }
   assert.equal(await rpc(adm, "mark_order_paid_manually", { p_order: data.id, p_note: "qa" }), null);
   assert.equal(await rpc(adm, "assign_partner", { p_order: data.id, p_partner: partnerId }), null);
   return data.id;
@@ -284,4 +287,21 @@ test("повторная загрузка заменяет отклонённы�
   assert.equal(d2.kind, "passport");
   const old = await client.c.from("documents").select("superseded_at").eq("id", d1.id).single();
   assert.ok(old.data.superseded_at, "старая версия помечена как заменённая");
+});
+
+test("оплата заказа с ITIN невозможна до одобрения основания", { skip }, async () => {
+  for (const product of ["itin_standard", "itin_return", "bundle_wy", "bundle_de"]) {
+    const { data, error } = await client.c.from("orders").insert({
+      client_id: client.id, product, status: "draft",
+      applicant: { name: "QA", country: "AM", company: "QA LLC", activity: "IT", quiz_ssn: "no", quiz_basis: "unknown" },
+    }).select("id").single();
+    assert.equal(error, null);
+    assert.equal(await rpc(client, "record_consent", { p_order: data.id, p_terms_version: "qa", p_refund_version: "qa" }), null);
+    assert.equal(await rpc(client, "submit_order", { p_order: data.id }), null);
+    assert.match(await rpc(adm, "mark_order_paid_manually", { p_order: data.id, p_note: "x" }) ?? "", /Eligibility approval required/, product);
+    assert.equal(await rpc(adm, "reject_eligibility", { p_order: data.id, p_reason: "QA no basis" }), null);
+    assert.match(await rpc(adm, "mark_order_paid_manually", { p_order: data.id, p_note: "x" }) ?? "", /Eligibility approval required/, product);
+    assert.equal(await rpc(adm, "approve_eligibility", { p_order: data.id }), null);
+    assert.equal(await rpc(adm, "mark_order_paid_manually", { p_order: data.id, p_note: "x" }), null, product);
+  }
 });

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, LockKeyhole } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { GOOGLE_AUTH_ENABLED } from "../lib/config";
@@ -30,6 +30,11 @@ export function Login() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const requested = params.get("next") || "/app";
+  const target = new URL(requested.startsWith("/app") ? requested : "/app", location.origin);
+  const destination = target.origin === location.origin && (target.pathname === "/app" || target.pathname.startsWith("/app/"))
+    ? target.pathname + target.search : "/app";
 
   function switchMode(value: boolean) {
     setSignup(value);
@@ -46,14 +51,14 @@ export function Login() {
         ? await supabase.auth.signUp({
             email: email.trim().toLowerCase(),
             password,
-            options: { emailRedirectTo: location.origin + "/app" },
+            options: { emailRedirectTo: location.origin + destination },
           })
         : await supabase.auth.signInWithPassword({
             email: email.trim().toLowerCase(),
             password,
           });
       if (error) throw error;
-      if (data.session) navigate("/app");
+      if (data.session) navigate(destination);
       else setMessage(t.checkEmail);
     } catch (error) {
       setMessage(authMessage(error, t.authErrors, t.error));
@@ -67,7 +72,7 @@ export function Login() {
     setBusy(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: location.origin + "/app" },
+      options: { redirectTo: location.origin + destination },
     });
     if (error) {
       setMessage(authMessage(error, t.authErrors, t.error));
