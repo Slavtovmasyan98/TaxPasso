@@ -1,4 +1,4 @@
-"""Guards for production migration rollouts (001–020). No database writes here."""
+"""Guards for production migration rollouts (001–021). No database writes here."""
 import os
 import re
 import subprocess
@@ -8,9 +8,9 @@ from urllib.parse import unquote, urlsplit
 
 LEGACY = "20260924234059 20260924234142 20260924234152 20260924234214 20260925050905 20260925053603 20260926000827 20260926011259 20260926013300 20260926015111".split()
 BASE = [f"{i:03}" for i in range(1, 11)]
-NEW = [f"{i:03}" for i in range(11, 21)]
-# Already applied through 018; preserve these files byte for byte.
-APPLIED = BASE + NEW[:8]
+NEW = [f"{i:03}" for i in range(11, 22)]
+# Already applied through 020; preserve these files byte for byte.
+APPLIED = BASE + NEW[:10]
 
 
 def require(condition, message):
@@ -63,7 +63,7 @@ def main():
         require(not repair or dry, "Repair history in a separate dry-run-only dispatch first.")
         source = Path("migration-source/supabase/migrations")
         files = sorted(source.glob("*.sql"))
-        require([f.name.split("_", 1)[0] for f in files] == BASE + NEW, "Release must contain exactly migrations 001–020.")
+        require([f.name.split("_", 1)[0] for f in files] == BASE + NEW, "Release must contain exactly migrations 001–021.")
         for f in files[:len(APPLIED)]:
             baseline = Path("supabase/migrations") / f.name
             require(baseline.exists() and baseline.read_bytes() == f.read_bytes(), f"Baseline migration differs: {f.name}")
@@ -81,7 +81,7 @@ def main():
     require(state == "normalized", "Migration history has not been normalized.")
     pending = [v for v in NEW if v not in versions]
     if mode == "after":
-        require(not pending, "Not all migrations 011–020 were applied.")
+        require(not pending, "Not all migrations 011–021 were applied.")
     print("Pending migration versions:", ", ".join(pending) or "none")
 
 
