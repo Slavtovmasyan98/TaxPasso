@@ -14,6 +14,11 @@ const CODES = ["BUSINESS_ADDRESS", "FORM_5472_1120", "DE_EXPEDITED"];
 let svc, client, other, adm, original;
 const op = () => crypto.randomUUID();
 const err = (r) => r.error?.message ?? null;
+// Оплата заказа с ожидающими услугами: сумма ОБЯЗАТЕЛЬНА и должна совпасть с «цена + услуги» (миграция 020)
+async function payFull(adm, o, note = "qa") {
+  const due = (await adm.c.rpc("order_payment_due", { p_order: o })).data[0].total_cents;
+  return err(await adm.c.rpc("mark_order_paid_manually", { p_order: o, p_note: note, p_amount_cents: due }));
+}
 
 async function makeUser(tag, role) {
   const email = `qa18+${tag}-${run}@taxpasso.test`;
@@ -90,7 +95,7 @@ test("запрос ≠ выдача: pending → active только после 
   assert.equal((await row()).status, "pending_payment", "услуга не выдана до оплаты");
   assert.notEqual(err(await client.c.rpc("mark_addon_paid", { p_order_addon: (await row()).id, p_note: "я заплатил", p_op: op() })), null, "клиент сам не подтверждает оплату");
 
-  assert.equal(err(await adm.c.rpc("mark_order_paid_manually", { p_order: o, p_note: "перевод получен" })), null);
+  assert.equal(await payFull(adm, o, "перевод получен"), null);
   const paid = await row();
   assert.equal(paid.status, "active", "оплата заказа активирует запрошенные при оформлении услуги");
   assert.ok(paid.period_end, "у годовой услуги есть конец периода");
@@ -103,7 +108,7 @@ test("отмена неоплаченного запроса, повторный
   const id = (await client.c.from("order_addons").select("id").eq("order_id", o).single()).data.id;
   assert.equal(err(await client.c.rpc("cancel_addon_request", { p_order_addon: id })), null);
   assert.equal((await client.c.rpc("request_addon", { p_order: o, p_addon_code: "FORM_5472_1120", p_op: op() })).data, "ok");
-  assert.equal(err(await adm.c.rpc("mark_order_paid_manually", { p_order: o, p_note: "x" })), null);
+  assert.equal(await payFull(adm, o, "x"), null);
   assert.match(err(await client.c.rpc("cancel_addon_request", { p_order_addon: id })) ?? "", /Only unpaid/);
 });
 
@@ -146,4 +151,43 @@ test("DE expedited блокируется после подачи в штат; �
   assert.notEqual(err(await other.c.rpc("request_addon", { p_order: oDe, p_addon_code: "BUSINESS_ADDRESS", p_op: op() })), null);
   assert.notEqual(err(await client.c.rpc("set_addon_price", { p_code: "BUSINESS_ADDRESS", p_price_cents: 1 })), null);
   assert.notEqual(err(await client.c.rpc("set_addon_active", { p_code: "BUSINESS_ADDRESS", p_active: false })), null);
+});
+
+test("оплата с ожидающими услугами: сумма обязательна и должна совпасть (F-09)", { skip }, async () => {
+  await activateAll();
+  const o = await newOrder("llc_wy");
+  assert.equal((await client.c.rpc("request_addon", { p_order: o, p_addon_code: "BUSINESS_ADDRESS", p_op: op() })).data, "ok");
+  const due = (await client.c.rpc("order_payment_due", { p_order: o })).data[0];
+  assert.equal(due.total_cents, due.base_cents + due.addons_cents);
+  assert.ok(due.addons_cents > 0, "ожидающая услуга входит в сумму");
+  assert.match(err(await adm.c.rpc("mark_order_paid_manually", { p_order: o, p_note: "без суммы" })) ?? "", /Amount required/);
+  assert.match(err(await adm.c.rpc("mark_order_paid_manually", { p_order: o, p_note: "только пакет", p_amount_cents: due.base_cents })) ?? "", /Amount mismatch/);
+  assert.equal(err(await adm.c.rpc("mark_order_paid_manually", { p_order: o, p_note: "полная сумма", p_amount_cents: due.total_cents })), null);
+  const row = (await client.c.from("orders").select("amount_cents,payment_status").eq("id", o).single()).data;
+  assert.deepEqual([row.payment_status, row.amount_cents], ["paid", due.total_cents]);
+  const oa = (await client.c.from("order_addons").select("status,paid_with_order").eq("order_id", o).single()).data;
+  assert.deepEqual([oa.status, oa.paid_with_order], ["active", true]);
+});
+
+test("отмена заказа гасит неоплаченные и оплаченные услуги (F-02)", { skip }, async () => {
+  await activateAll();
+  const oPending = await newOrder("llc_wy");
+  await client.c.rpc("request_addon", { p_order: oPending, p_addon_code: "BUSINESS_ADDRESS", p_op: op() });
+  assert.equal(err(await adm.c.rpc("cancel_order", { p_order: oPending, p_reason: "клиент отказался", p_op: op() })), null);
+  assert.deepEqual((await adm.c.from("order_addons").select("status").eq("order_id", oPending)).data.map((r) => r.status), ["cancelled"]);
+
+  const oActive = await newOrder("llc_wy");
+  await client.c.rpc("request_addon", { p_order: oActive, p_addon_code: "BUSINESS_ADDRESS", p_op: op() });
+  assert.equal(await payFull(adm, oActive), null);
+  assert.equal(err(await adm.c.rpc("cancel_order", { p_order: oActive, p_reason: "клиент отказался", p_op: op() })), null);
+  assert.deepEqual((await adm.c.from("order_addons").select("status").eq("order_id", oActive)).data.map((r) => r.status), ["cancelled"]);
+});
+
+test("оплата отменённого заказа служебным путём запрещена и не активирует услуги (F-03)", { skip }, async () => {
+  await activateAll();
+  const o = await newOrder("llc_wy");
+  await client.c.rpc("request_addon", { p_order: o, p_addon_code: "BUSINESS_ADDRESS", p_op: op() });
+  assert.equal(err(await adm.c.rpc("cancel_order", { p_order: o, p_reason: "клиент отказался", p_op: op() })), null);
+  assert.ok((await svc.from("orders").update({ payment_status: "paid" }).eq("id", o)).error, "отменённый заказ нельзя пометить оплаченным");
+  assert.deepEqual((await adm.c.from("order_addons").select("status").eq("order_id", o)).data.map((r) => r.status), ["cancelled"]);
 });
