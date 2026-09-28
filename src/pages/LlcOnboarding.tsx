@@ -1,7 +1,7 @@
 // Новый онбординг LLC в стиле Doola (тестовая версия, адрес /app/start).
 // Старая анкета /app/new не затронута. Чтобы убрать тест — удалите этот файл и маршрут "start" в main.tsx.
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
-import { Link, useOutletContext } from "react-router-dom";
+import { Link, useOutletContext, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft, ArrowRight, Building2, Check, CircleCheck, FileText,
   Info, Layers, Plus, Star, Trash2, Upload, Landmark,
@@ -27,6 +27,15 @@ const CATEGORIES = [
   ["other", "Другое (консалтинг и т. п.)", "Other (consulting, etc.)"],
 ] as const;
 
+// Сумма к оплате считается на сервере (миграция 021: order_payment_due). Интерфейс только показывает ответ.
+type Due = { base_cents: number; renewals_cents: number; state_fee_cents: number; addons_cents: number; total_cents: number; years: number };
+const usd = (cents: number) => "$" + (cents / 100).toLocaleString("en-US", { minimumFractionDigits: cents % 100 ? 2 : 0 });
+const TERM_ERRORS: Record<string, [string, string]> = {
+  "Invalid service term": ["Выберите срок обслуживания от 1 до 3 лет.", "Choose a service term of 1 to 3 years."],
+  "Order already paid": ["Заказ уже оплачен, срок изменить нельзя. Для продления свяжитесь с нами.", "This order is already paid and the term can't be changed. Contact us to renew."],
+  "Not available for this order": ["Для этого продукта срок обслуживания не выбирается.", "A service term isn't available for this product."],
+};
+
 const box: CSSProperties = {
   display: "flex", alignItems: "center", gap: 14, width: "100%", textAlign: "left",
   border: "1px solid var(--line)", borderRadius: 12, padding: "16px 18px",
@@ -41,6 +50,7 @@ export function LlcOnboarding() {
   const { session } = useAuth();
   const { refresh } = useOutletContext<{ refresh: () => void }>();
   const countries = useMemo(() => countryList(lang), [lang]);
+  const [params] = useSearchParams();
 
   const [step, setStep] = useState(0);
   const [svc, setSvc] = useState<Svc>("");
@@ -57,6 +67,10 @@ export function LlcOnboarding() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  // Срок обслуживания: предвыбор из калькулятора /pricing (?years=2), клиент может изменить.
+  const [years, setYears] = useState(() => Math.min(3, Math.max(1, Number(params.get("years")) || 1)));
+  const [due, setDue] = useState<Due | null>(null);
+  const [draftProduct, setDraftProduct] = useState("");
 
   const labels = ru
     ? ["Услуга", "Страна", "Штат", "Название", "Оплата", "Владельцы", "Компания"]
@@ -67,18 +81,65 @@ export function LlcOnboarding() {
 
   function fail(msg: string) { setErr(msg); return false; }
 
-  // Шаг 5: создаём черновик заказа и сохраняем согласие. Оплату отмечает админ (до подключения Stripe).
-  async function createDraft() {
+  const product = svc === "bundle" ? (st === "DE" ? "bundle_de" : "bundle_wy") : st === "DE" ? "llc_de" : "llc_wy";
+
+  // Сумма и состав — только с сервера. Если в базе нет 021 (нет колонки years), остаётся прежняя сводка.
+  async function loadDue(id: string) {
+    if (!supabase) return;
+    const { data, error } = await supabase.rpc("order_payment_due", { p_order: id });
+    const row = !error && Array.isArray(data) ? (data[0] as Due | undefined) : undefined;
+    setDue(row && typeof row.years === "number" ? row : null);
+  }
+  async function applyTerm(id: string, y: number) {
+    if (!supabase) return true;
+    const { error } = await supabase.rpc("set_order_service_years", { p_order: id, p_years: y });
+    if (error) {
+      const m = TERM_ERRORS[error.message];
+      if (m) return fail(ru ? m[0] : m[1]);
+      // База без 021: выбора срока нет, работаем по-старому.
+      setDue(null);
+      return true;
+    }
+    await loadDue(id);
+    return true;
+  }
+  async function chooseTerm(y: number) {
+    setErr("");
+    const prev = years;
+    setYears(y);
+    if (demoMode || !orderId) return;
+    setBusy(true);
+    const ok = await applyTerm(orderId, y);
+    if (!ok) setYears(prev);
+    setBusy(false);
+  }
+
+  // Переход к шагу «Оплата»: черновик заказа нужен, чтобы сервер посчитал сумму.
+  // Продукт в черновике клиент менять не может, поэтому при смене штата/услуги создаём новый черновик.
+  async function ensureDraft() {
     if (demoMode || !supabase || !session) return true;
-    const { data, error } = await supabase.from("orders").insert({
-      client_id: session.user.id,
-      product: svc === "bundle" ? (st === "DE" ? "bundle_de" : "bundle_wy") : st === "DE" ? "llc_de" : "llc_wy",
-      applicant: { country, company: `${name.trim()} ${ending}` },
-      status: "draft",
-    }).select("id").single();
-    if (error || !data) return fail(T("Не удалось создать заказ. Попробуйте ещё раз.", "Could not create the order. Try again."));
-    setOrderId(data.id);
-    try { await recordConsent(data.id); } catch { return fail(T("Не удалось сохранить согласие.", "Could not save consent.")); }
+    const applicant = { country, company: `${name.trim()} ${ending}` };
+    let id = orderId;
+    if (id && draftProduct === product) {
+      const { error } = await supabase.from("orders").update({ applicant }).eq("id", id);
+      if (error) return fail(T("Не удалось обновить заказ. Попробуйте ещё раз.", "Could not update the order. Try again."));
+    } else {
+      const { data, error } = await supabase.from("orders")
+        .insert({ client_id: session.user.id, product, applicant, status: "draft" }).select("id").single();
+      if (error || !data) return fail(T("Не удалось создать заказ. Попробуйте ещё раз.", "Could not create the order. Try again."));
+      id = data.id as string;
+      setOrderId(id); setDraftProduct(product);
+    }
+    await loadDue(id);
+    if (years !== 1) await applyTerm(id, years);
+    refresh();
+    return true;
+  }
+
+  // Шаг 5 → 6: согласие сохраняется вместе с версиями условий. Оплату отмечает админ (до подключения Stripe).
+  async function confirmPlan() {
+    if (demoMode || !supabase || !orderId) return true;
+    try { await recordConsent(orderId); } catch { return fail(T("Не удалось сохранить согласие.", "Could not save consent.")); }
     refresh();
     return true;
   }
@@ -139,10 +200,13 @@ export function LlcOnboarding() {
     if (step === 0 && (!svc || svc === "itin")) return fail(svc === "itin" ? T("Для ITIN будет отдельная анкета.", "ITIN has a separate form.") : T("Выберите услугу", "Choose a service"));
     if (step === 1 && !country) return fail(T("Выберите страну", "Choose a country"));
     if (step === 2 && !st) return fail(T("Выберите штат", "Choose a state"));
-    if (step === 3 && name.trim().length < 2) return fail(T("Введите название компании", "Enter a company name"));
+    if (step === 3) {
+      if (name.trim().length < 2) return fail(T("Введите название компании", "Enter a company name"));
+      setBusy(true); const ok = await ensureDraft(); setBusy(false); if (!ok) return;
+    }
     if (step === 4) {
       if (!consent) return fail(T("Отметьте согласие с условиями", "Accept the terms to continue"));
-      setBusy(true); const ok = await createDraft(); setBusy(false); if (!ok) return;
+      setBusy(true); const ok = await confirmPlan(); setBusy(false); if (!ok) return;
     }
     if (step === 5) {
       if (owners.some((o) => !o.first.trim() || !o.last.trim())) return fail(T("Заполните имя и фамилию всех владельцев", "Enter every owner's first and last name"));
@@ -238,9 +302,43 @@ export function LlcOnboarding() {
 
       {step === 4 && <>
         <h2>{T("Ваш план", "Your plan")}</h2>
-        <div className="cost-row"><span>{name.trim()} {ending} · {st === "DE" ? "Delaware" : "Wyoming"}{svc === "bundle" ? " + ITIN" : ""}</span><strong>${total}</strong></div>
-        <div className="cost-row"><span className="muted">{T("Входит: госпошлина, агент на год, EIN, operating agreement", "Includes: state fee, agent for a year, EIN, operating agreement")}</span><span /></div>
-        <div className="cost-row"><span className="muted">{T("Со второго года: продление + платёж штату", "From year two: renewal + state payment")}</span><strong>${yearly}/{T("год", "yr")}</strong></div>
+        {due ? <>
+          <span className="eyebrow" style={{ display: "block", marginBottom: 8 }}>{T("Срок обслуживания", "Service term")}</span>
+          <div className="segmented" role="radiogroup" aria-label={T("Срок обслуживания", "Service term")}>
+            {[1, 2, 3].map((y) => (
+              <button key={y} type="button" role="radio" aria-checked={years === y} className={years === y ? "selected" : ""}
+                disabled={busy} onClick={() => chooseTerm(y)}>
+                {y === 1 ? T("1 год — включён", "1 year — included") : y === 2 ? T("2 года", "2 years") : T("3 года", "3 years")}
+              </button>
+            ))}
+          </div>
+          <p className="muted" style={{ fontSize: 13 }}>
+            {T("Обслуживание включает услуги Registered Agent и сопровождение компании. Первый год входит в стоимость пакета; последующие годы оплачиваются заранее, при оформлении заказа.",
+               "Service includes Registered Agent and ongoing company support. The first year is included in the package; later years are paid in advance at checkout.")}
+          </p>
+          <span className="eyebrow" style={{ display: "block", margin: "18px 0 6px" }}>{T("К оплате сейчас", "Due now")}</span>
+          <div className="cost-row"><span>{T(`LLC ${st === "DE" ? "Delaware" : "Wyoming"} и EIN — регистрация`, `LLC ${st === "DE" ? "Delaware" : "Wyoming"} and EIN — formation`)}{svc === "bundle" ? " + ITIN" : ""}</span><strong>{usd(due.base_cents)}</strong></div>
+          <div className="cost-row"><span className="muted" style={{ fontSize: 13 }}>{T("Государственная пошлина за регистрацию, услуги Registered Agent на первый год, получение EIN, комплект учредительных документов.", "State filing fee, Registered Agent for the first year, EIN, and the formation document set.")}</span><span /></div>
+          {due.renewals_cents > 0 && <>
+            <div className="cost-row"><span>{T(`Обслуживание: ${due.years === 2 ? "второй год" : "второй и третий годы"}`, `Service: ${due.years === 2 ? "year 2" : "years 2 and 3"}`)}</span><strong>{usd(due.renewals_cents)}</strong></div>
+            <div className="cost-row"><span className="muted" style={{ fontSize: 13 }}>{T("Registered Agent и сопровождение", "Registered Agent and support")} · {usd(due.renewals_cents / (due.years - 1))} × {due.years - 1}</span><span /></div>
+          </>}
+          {due.state_fee_cents > 0 && <>
+            <div className="cost-row"><span>{T(`Государственный сбор штата: ${due.years === 2 ? "второй год" : "второй и третий годы"}`, `State fee: ${due.years === 2 ? "year 2" : "years 2 and 3"}`)} <span className="badge neutral">{T("оплачивается штату", "paid to the state")}</span></span><strong>{usd(due.state_fee_cents)}</strong></div>
+            <div className="cost-row"><span className="muted" style={{ fontSize: 13 }}>{st === "DE"
+              ? T("Ежегодный налог штата Delaware — $400 в год, срок оплаты — 1 июня. Налог оплачивается штату от вашего имени.", "Delaware annual tax — $400 per year, due June 1. The tax is paid to the state on your behalf.")
+              : T("Ежегодный отчёт штата Wyoming — от $60 в год, срок — месяц регистрации компании. Сбор оплачивается штату от вашего имени.", "Wyoming annual report — from $60 per year, due in the company's formation month. The fee is paid to the state on your behalf.")}</span><span /></div>
+          </>}
+          {due.addons_cents > 0 && <div className="cost-row"><span>{T("Дополнительные услуги", "Additional services")}</span><strong>{usd(due.addons_cents)}</strong></div>}
+          <div className="cost-row" style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}><b>{T("Итого", "Total")}</b><strong>{usd(due.total_cents)}</strong></div>
+          <p className="fineprint">{due.state_fee_cents > 0
+            ? T(`В том числе государственные сборы: ${usd(due.state_fee_cents)} · услуги Taxpasso: ${usd(due.total_cents - due.state_fee_cents)}`, `Of which government fees: ${usd(due.state_fee_cents)} · Taxpasso services: ${usd(due.total_cents - due.state_fee_cents)}`)
+            : T("В первый год государственные сборы штата оплачивать не требуется.", "No state fees are payable in the first year.")}</p>
+        </> : <>
+          <div className="cost-row"><span>{name.trim()} {ending} · {st === "DE" ? "Delaware" : "Wyoming"}{svc === "bundle" ? " + ITIN" : ""}</span><strong>${total}</strong></div>
+          <div className="cost-row"><span className="muted">{T("Входит: госпошлина, агент на год, EIN, operating agreement", "Includes: state fee, agent for a year, EIN, operating agreement")}</span><span /></div>
+          <div className="cost-row"><span className="muted">{T("Со второго года: продление + платёж штату", "From year two: renewal + state payment")}</span><strong>${yearly}/{T("год", "yr")}</strong></div>
+        </>}
         <label className="checkbox" style={{ marginTop: 18 }}>
           <input type="checkbox" checked={consent} onChange={(e) => { setConsent(e.target.checked); setErr(""); }} />
           <span>{T("Принимаю ", "I accept the ")}<Link to="/terms" target="_blank">{T("условия", "terms")}</Link>, <Link to="/privacy" target="_blank">{T("политику конфиденциальности", "privacy policy")}</Link> {T("и", "and")} <Link to="/refund" target="_blank">{T("возврата", "refund policy")}</Link></span>
@@ -315,7 +413,7 @@ export function LlcOnboarding() {
         )}
         <Button disabled={busy} onClick={next}>
           {busy ? T("Сохраняем…", "Saving…")
-            : step === 4 ? T(`Оформить за $${total}`, `Order for $${total}`)
+            : step === 4 ? (due ? T(`Оформить за ${usd(due.total_cents)}`, `Order for ${usd(due.total_cents)}`) : T(`Оформить за $${total}`, `Order for $${total}`))
             : step === 6 ? T("Отправить на регистрацию", "Submit for formation")
             : T("Продолжить", "Continue")}
           <ArrowRight size={16} />
