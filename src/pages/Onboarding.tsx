@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useSearchParams, useOutletContext } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams, useOutletContext } from "react-router-dom";
 import { Check, ArrowRight, Upload, LockKeyhole } from "lucide-react";
 import { useI18n } from "../i18n";
 import {
@@ -12,11 +12,17 @@ import { countryList } from "../lib/countries";
 import { useAuth } from "../lib/auth";
 import { products } from "./Pricing";
 import { Button } from "../components/ui/button";
+const isLlc = (p: string) => p.startsWith("llc_") || p.startsWith("bundle_");
+function newFormLink(product: string, quiz: Record<string, string>) {
+  const q = new URLSearchParams({ product, ...quiz });
+  return `/app/start?${q.toString()}`;
+}
 export function Onboarding() {
   const { t, lang } = useI18n();
   const { session } = useAuth();
   const { refresh } = useOutletContext<{ refresh: () => void }>();
   const [params] = useSearchParams();
+  const navigate = useNavigate();
   const [product, setProduct] = useState(
     products.some((p) => p.id === params.get("product"))
       ? params.get("product")!
@@ -69,6 +75,10 @@ export function Onboarding() {
   }
   async function next() {
     setMessage("");
+    if (step === 0 && isLlc(product)) {
+      navigate(newFormLink(product, quiz));
+      return;
+    }
     if (step === 0) {
       setBusy(true);
       try {
@@ -148,6 +158,10 @@ export function Onboarding() {
       setBusy(false);
     }
   }
+  // LLC и пакеты оформляются в новом мастере /app/start (срок обслуживания, сумма с сервера).
+  // Эта анкета остаётся для ITIN.
+  const initial = params.get("product");
+  if (initial && isLlc(initial)) return <Navigate to={newFormLink(initial, quiz)} replace />;
   return (
     <section className="panel wizard">
       <div className="wizard-steps">

@@ -1,5 +1,6 @@
-// Новый онбординг LLC в стиле Doola (тестовая версия, адрес /app/start).
-// Старая анкета /app/new не затронута. Чтобы убрать тест — удалите этот файл и маршрут "start" в main.tsx.
+// Онбординг LLC и пакетов (адрес /app/start). Все входы в LLC ведут сюда: страница LLC, карточки /pricing,
+// калькулятор (?product=…&years=…), опросник ITIN для пакетов. Анкета /app/new осталась для ITIN и
+// перенаправляет сюда, если в ней выбрали LLC или пакет.
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { Link, useOutletContext, useSearchParams } from "react-router-dom";
 import {
@@ -52,10 +53,15 @@ export function LlcOnboarding() {
   const countries = useMemo(() => countryList(lang), [lang]);
   const [params] = useSearchParams();
 
-  const [step, setStep] = useState(0);
-  const [svc, setSvc] = useState<Svc>("");
+  // Продукт, выбранный на карточке /pricing, странице LLC или в опроснике ITIN, приходит в ?product=.
+  // Он предвыбран, клиент может изменить его, вернувшись на шаг «Услуга».
+  const preset = params.get("product") || "";
+  const presetSvc: Svc = preset.startsWith("bundle_") ? "bundle" : preset.startsWith("llc_") ? "llc" : "";
+  const presetState: State = preset.endsWith("_de") ? "DE" : preset.endsWith("_wy") ? "WY" : "";
+  const [step, setStep] = useState(presetSvc ? 1 : 0);
+  const [svc, setSvc] = useState<Svc>(presetSvc);
   const [country, setCountry] = useState("AM");
-  const [st, setSt] = useState<State>("");
+  const [st, setSt] = useState<State>(presetState);
   const [name, setName] = useState("");
   const [ending, setEnding] = useState("LLC");
   const [consent, setConsent] = useState(false);
@@ -80,6 +86,12 @@ export function LlcOnboarding() {
   const pctSum = owners.reduce((a, o) => a + (Number(o.pct) || 0), 0);
 
   function fail(msg: string) { setErr(msg); return false; }
+
+  // Ответы опросника ITIN (для пакета) сохраняются в анкете, как в прежней форме.
+  const quiz: Record<string, string> = {};
+  const qs = params.get("quiz_ssn"), qb = params.get("quiz_basis");
+  if (qs && ["no", "unsure"].includes(qs)) quiz.quiz_ssn = qs;
+  if (qb && ["prepare_return", "return_ready", "irs_exception", "unknown", "none"].includes(qb)) quiz.quiz_basis = qb;
 
   const product = svc === "bundle" ? (st === "DE" ? "bundle_de" : "bundle_wy") : st === "DE" ? "llc_de" : "llc_wy";
 
@@ -118,7 +130,7 @@ export function LlcOnboarding() {
   // Продукт в черновике клиент менять не может, поэтому при смене штата/услуги создаём новый черновик.
   async function ensureDraft() {
     if (demoMode || !supabase || !session) return true;
-    const applicant = { country, company: `${name.trim()} ${ending}` };
+    const applicant = { country, company: `${name.trim()} ${ending}`, ...quiz };
     let id = orderId;
     if (id && draftProduct === product) {
       const { error } = await supabase.from("orders").update({ applicant }).eq("id", id);
@@ -172,7 +184,7 @@ export function LlcOnboarding() {
     const { error: aErr } = await supabase.from("orders").update({
       applicant: {
         name: `${resp.first.trim()} ${resp.last.trim()}`, country,
-        company: `${name.trim()} ${ending}`, activity: desc.trim().slice(0, 1000),
+        company: `${name.trim()} ${ending}`, activity: desc.trim().slice(0, 1000), ...quiz,
       },
     }).eq("id", orderId);
     if (aErr) return fail(T("Не удалось обновить заявку.", "Could not update the application."));
