@@ -1678,14 +1678,14 @@ a:hover {
   margin: 14px 0;
   padding: 12px 14px;
   color: #991b1b;
-  background: color-mix(in srgb, #ef4444 10%, var(--panel));
+  background: color-mix(in srgb, #ef4444 10%, var(--bg));
   border: 1px solid color-mix(in srgb, #ef4444 42%, transparent);
   border-radius: 14px;
   text-decoration: none;
 }
 .rejected-document-alert:hover {
   border-color: #ef4444;
-  background: color-mix(in srgb, #ef4444 15%, var(--panel));
+  background: color-mix(in srgb, #ef4444 15%, var(--bg));
 }
 .rejected-document-alert:focus-visible {
   outline: 3px solid color-mix(in srgb, #ef4444 40%, transparent);
