@@ -86,7 +86,7 @@ export function PricingCards({ full = false }: { full?: boolean }) {
               to={
                 p.id.includes("itin") || p.id.includes("bundle")
                   ? "/itin?product=" + p.id + "#quiz"
-                  : "/app/new?product=" + p.id
+                  : "/app/start?product=" + p.id
               }
             >
               {t.choose}
@@ -211,7 +211,7 @@ export function Calculator() {
         </p>
         {/* Срок переносится в мастер как предвыбор; ничего не покупается. */}
         <Button asChild>
-          <Link to={`/app/start?years=${years}`}>
+          <Link to={`/app/start?product=${id}&years=${years}`}>
             {lang === "ru" ? "Оформить с этим сроком" : "Start with this term"}
             <ArrowRight size={16} />
           </Link>
