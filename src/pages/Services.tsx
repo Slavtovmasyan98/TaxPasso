@@ -4,6 +4,7 @@ import { ArrowRight, Check, ShieldCheck, Info } from "lucide-react";
 import { useI18n } from "../i18n";
 import { Button } from "../components/ui/button";
 import { Steps, FAQBlock, CTA } from "./Home";
+import { SPECIALIST_CONSULT_ENABLED } from "../lib/config";
 export function LLC() {
   const { t, lang } = useI18n();
   return (
@@ -94,6 +95,7 @@ export function LLC() {
 type QuizOutcome =
   | { kind: "has_ssn" }
   | { kind: "no_basis" }
+  | { kind: "consult" }
   | { kind: "apply"; product: string; review: boolean; note?: string; alt?: string };
 
 // Коды ответов передаются в анкету, чтобы специалист видел их в заказе.
@@ -140,6 +142,8 @@ export function ITINQuiz() {
   function decide(): QuizOutcome {
     if (ssn === "1") return { kind: "has_ssn" };
     if (basis === "4") return { kind: "no_basis" };
+    // «Не знаю» — отдельный заказ itin_consult: тариф ITIN до решения администратора не назначаем.
+    if (basis === "3" && SPECIALIST_CONSULT_ENABLED) return { kind: "consult" };
     const review = ssn === "2" || basis === "3";
     const formNote = T("Это предварительная рекомендация: налоговый статус и нужную форму декларации (1040-NR или 1040) подтвердит специалист.",
                        "This is a preliminary recommendation: a specialist will confirm your tax status and the right return form (1040-NR or 1040).");
@@ -168,6 +172,11 @@ export function ITINQuiz() {
   const applyLink = (product: string, basisCode = BASIS_CODES[Number(basis)] || "") =>
     `/app/new?product=${product}&quiz_ssn=${SSN_CODES[Number(ssn)] || ""}&quiz_basis=${basisCode}`;
 
+  // Консультация специалиста (016–017): вместо заказа ITIN создаётся заказ itin_consult.
+  const consultLink = () =>
+    `/app/consult?quiz_ssn=${SSN_CODES[Number(ssn)] || ""}&quiz_basis=${BASIS_CODES[Number(basis)] || ""}`;
+  const consultNote = T("Специалист свяжется с вами в Telegram или WhatsApp и проверит основание. Консультация не гарантирует выдачу ITIN, оплату до подтверждения основания мы не берём.",
+                        "A specialist will contact you on Telegram or WhatsApp to check your basis. A consultation does not guarantee an ITIN; we don't take payment before the basis is confirmed.");
   const productName = (id: string) =>
     ({ itin_standard: "ITIN Standard · $259", itin_return: T("ITIN + подготовка декларации · $400", "ITIN + tax return · $400"),
        bundle_wy: T("Старт в США · WY · $549", "US Launch · WY · $549"), bundle_de: T("Старт в США · DE · $649", "US Launch · DE · $649") } as Record<string, string>)[id] || id;
@@ -224,10 +233,36 @@ export function ITINQuiz() {
             <h3>{T("По вашим ответам основание для ITIN не видно", "Your answers don't show a basis for an ITIN")}</h3>
             <p>{T("Это предварительный вывод. IRS выдаёт ITIN только при налоговой причине. LLC и EIN можно оформить без ITIN. Если вы не уверены, специалист проверит основание бесплатно, до оплаты.",
                   "This is a preliminary conclusion. The IRS issues an ITIN only for a tax reason. You can form an LLC and get an EIN without an ITIN. If you're unsure, a specialist will check the basis free of charge, before payment.")}</p>
+            {SPECIALIST_CONSULT_ENABLED ? (
+              <>
+                <p className="muted">{consultNote}</p>
+                <div className="button-row">
+                  <Button variant="outline" onClick={restart}>{t.back}</Button>
+                  <Button variant="outline" asChild><Link to={`/app/new?product=${llcProduct}`}>{T("Открыть LLC + EIN", "Form an LLC + EIN")}</Link></Button>
+                  <Button asChild><Link to={consultLink()}>{T("Проверить у специалиста", "Ask a specialist to check")}<ArrowRight size={17} /></Link></Button>
+                </div>
+              </>
+            ) : (
+              <div className="button-row">
+                <Button variant="outline" onClick={restart}>{t.back}</Button>
+                <Button variant="outline" asChild><Link to={applyLink(fromBundle ? requested! : "itin_standard", "none")}>{T("Проверить у специалиста", "Ask a specialist to check")}</Link></Button>
+                <Button asChild><Link to={`/app/new?product=${llcProduct}`}>{T("Открыть LLC + EIN", "Form an LLC + EIN")}</Link></Button>
+              </div>
+            )}
+          </>
+        ) : outcome.kind === "consult" ? (
+          <>
+            <Info size={34} />
+            <h3>{T("Основание проверит специалист", "A specialist will check your basis")}</h3>
+            <p>{T("Если вы не знаете, есть ли у вас налоговая причина для ITIN, начнём с бесплатной консультации. После интервью Taxpasso подтвердит подходящий тариф или объяснит, почему ITIN не нужен.",
+                  "If you don't know whether you have a tax reason for an ITIN, we start with a free consultation. After the interview Taxpasso confirms the right plan or explains why you don't need an ITIN.")}</p>
+            <p className="muted">{consultNote}</p>
             <div className="button-row">
               <Button variant="outline" onClick={restart}>{t.back}</Button>
-              <Button variant="outline" asChild><Link to={applyLink(fromBundle ? requested! : "itin_standard", "none")}>{T("Проверить у специалиста", "Ask a specialist to check")}</Link></Button>
-              <Button asChild><Link to={`/app/new?product=${llcProduct}`}>{T("Открыть LLC + EIN", "Form an LLC + EIN")}</Link></Button>
+              {fromBundle && (
+                <Button variant="outline" asChild><Link to={`/app/new?product=${llcProduct}`}>{T("Открыть LLC + EIN без ITIN", "Form an LLC + EIN without an ITIN")}</Link></Button>
+              )}
+              <Button asChild><Link to={consultLink()}>{T("Проверить у специалиста", "Ask a specialist to check")}<ArrowRight size={17} /></Link></Button>
             </div>
           </>
         ) : (
