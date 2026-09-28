@@ -6,6 +6,7 @@ import {
   Navigate,
   useLocation,
   useOutletContext,
+  useSearchParams,
 } from "react-router-dom";
 import {
   ArrowUpRight,
@@ -194,6 +195,7 @@ export function OrderTracker({ order }: { order: Order }) {
   const current = codes.indexOf(order.status);
   const [itinInfo, setItinInfo] = useState<{ itin: string; assigned_on: string | null } | null>(null);
   const [irsEvents, setIrsEvents] = useState<{ id: string; kind: string; note: string; attempt: number; created_at: string }[]>([]);
+  const [rejectedDocs, setRejectedDocs] = useState<{ id: string; name: string; review_comment: string | null }[]>([]);
   useEffect(() => {
     if (!supabase || !showItinDetails) return;
     let active = true;
@@ -219,6 +221,33 @@ export function OrderTracker({ order }: { order: Order }) {
       window.clearInterval(interval);
     };
   }, [order.id, showItinDetails]);
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+    const loadRejected = () => {
+      if (document.visibilityState === "hidden") return;
+      supabase!
+        .from("documents")
+        .select("id,name,review_comment")
+        .eq("order_id", order.id)
+        .eq("review_status", "rejected")
+        .is("superseded_at", null)
+        .order("created_at", { ascending: false })
+        .then(({ data, error }) => {
+          if (active && !error) setRejectedDocs(data || []);
+        });
+    };
+    loadRejected();
+    window.addEventListener("focus", loadRejected);
+    document.addEventListener("visibilitychange", loadRejected);
+    const interval = window.setInterval(loadRejected, 30_000);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", loadRejected);
+      document.removeEventListener("visibilitychange", loadRejected);
+      window.clearInterval(interval);
+    };
+  }, [order.id]);
   const paymentLabel = order.payment_status === "paid" ? (lang === "ru" ? "Оплачено" : "Paid") : (lang === "ru" ? "Ожидает оплаты" : "Awaiting payment");
   return (
     <article className="panel tracker">
@@ -245,6 +274,25 @@ export function OrderTracker({ order }: { order: Order }) {
           : (lang === "ru" ? "IRS отказал: " : "The IRS rejected the application: ")}
         {event.note}{event.kind==="rejection" && (lang==="ru" ? `. Готовим повторную подачу бесплатно (попытка ${event.attempt+1})` : `. We are preparing a free resubmission (attempt ${event.attempt+1})`)}
       </p>)}
+      {rejectedDocs.length > 0 && (
+        <Link
+          className="rejected-document-alert"
+          to={"/app/documents?order=" + order.id}
+          role="alert"
+          aria-label={lang === "ru" ? "Перейти к отклонённым документам" : "Go to rejected documents"}
+        >
+          <span className="rejected-document-dot" aria-hidden="true" />
+          <span>
+            <b>{lang === "ru" ? "Документ отклонён" : "Document rejected"}</b>
+            {rejectedDocs.map((doc) => (
+              <small key={doc.id}>
+                {doc.name}{doc.review_comment ? ": " + doc.review_comment : ""}
+              </small>
+            ))}
+          </span>
+          <ArrowUpRight size={18} aria-hidden="true" />
+        </Link>
+      )}
       <ol className="timeline">
         {codes.map((s, i) => {
           const history = order.order_status_history?.find(
@@ -508,12 +556,13 @@ type Doc = {
 export function Documents() {
   const { t, lang } = useI18n();
   const { orders, role } = useOutletContext<AppContext>();
+  const [params] = useSearchParams();
   const [docs, setDocs] = useState<Doc[]>([]);
   // Готовые документы от партнёра, которые администратор передал клиенту
   const [readyDocs, setReadyDocs] = useState<
     { id: string; name: string; path: string; order_id: string; created_at: string; published_at: string | null; doc_type?: string }[]
   >([]);
-  const [orderId, setOrderId] = useState("");
+  const [orderId, setOrderId] = useState(params.get("order") || "");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   async function load() {
