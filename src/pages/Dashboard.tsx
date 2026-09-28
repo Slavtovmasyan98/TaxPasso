@@ -29,6 +29,8 @@ import {
   type Order,
 } from "../lib/supabase";
 import { Button } from "../components/ui/button";
+import { ConsultTracker } from "./Consult";
+import { OrderAddons } from "./Addons";
 export const llcCodes = [
   "application",
   "review",
@@ -460,7 +462,12 @@ export function Dashboard() {
                 {new Date(r.created_at).toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US")} · {r.reason}
               </p>
             ))}
-            <OrderTracker order={o} />
+            {o.product === "itin_consult" ? (
+              <ConsultTracker order={o} onChanged={refresh} />
+            ) : (
+              <OrderTracker order={o} />
+            )}
+            <OrderAddons order={o} />
             {o.itin_status && (
               <OrderTracker
                 order={{

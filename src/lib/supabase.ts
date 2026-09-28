@@ -31,6 +31,8 @@ export type Order = {
   applicant: Record<string, string>;
   eligibility: string;
   eligibility_note?: string | null;
+  closed_at?: string | null;
+  cancelled_at?: string | null;
   payment_status?: "unpaid" | "paid" | "refunded";
   payment_note?: string | null;
   payment_marked_manually?: boolean;
