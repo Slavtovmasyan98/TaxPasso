@@ -1669,3 +1669,50 @@ a:hover {
     transition: none !important;
   }
 }
+
+.rejected-document-alert {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 12px 14px;
+  color: #991b1b;
+  background: color-mix(in srgb, #ef4444 10%, var(--panel));
+  border: 1px solid color-mix(in srgb, #ef4444 42%, transparent);
+  border-radius: 14px;
+  text-decoration: none;
+}
+.rejected-document-alert:hover {
+  border-color: #ef4444;
+  background: color-mix(in srgb, #ef4444 15%, var(--panel));
+}
+.rejected-document-alert:focus-visible {
+  outline: 3px solid color-mix(in srgb, #ef4444 40%, transparent);
+  outline-offset: 2px;
+}
+.rejected-document-alert span:nth-child(2) {
+  display: grid;
+  gap: 4px;
+}
+.rejected-document-alert small {
+  display: block;
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+.rejected-document-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: #dc2626;
+  box-shadow: 0 0 0 4px color-mix(in srgb, #ef4444 16%, transparent);
+}
+@media (max-width: 520px) {
+  .rejected-document-alert {
+    grid-template-columns: auto 1fr;
+  }
+  .rejected-document-alert > svg {
+    display: none;
+  }
+}
