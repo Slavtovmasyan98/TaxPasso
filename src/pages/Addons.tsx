@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { useI18n } from "../i18n";
 import { supabase, type Order } from "../lib/supabase";
@@ -45,8 +45,6 @@ export function OrderAddons({ order }: { order: Order }) {
   const [requested, setRequested] = useState<Requested[]>([]);
   const [busy, setBusy] = useState("");
   const [msg, setMsg] = useState("");
-  // Один ключ идемпотентности на операцию: повтор после сетевой ошибки не создаст второй запрос.
-  const ops = useRef<Record<string, string>>({});
 
   function load() {
     if (!eligible) return;
@@ -72,11 +70,9 @@ export function OrderAddons({ order }: { order: Order }) {
   async function request(code: string) {
     setMsg("");
     setBusy(code);
-    ops.current[code] ||= crypto.randomUUID();
-    const { data, error } = await supabase!.rpc("request_addon", { p_order: order.id, p_addon_code: code, p_op: ops.current[code] });
+    const { data, error } = await supabase!.rpc("request_addon", { p_order: order.id, p_addon_code: code, p_op: crypto.randomUUID() });
     setBusy("");
     if (error) { setMsg(addonError(error.message, ru)); load(); return; }
-    delete ops.current[code];
     setMsg(data === "already_requested" ? T("Эта услуга уже запрошена.", "This service is already requested.") : T("Услуга добавлена в заказ.", "Service added to your order."));
     load();
   }
