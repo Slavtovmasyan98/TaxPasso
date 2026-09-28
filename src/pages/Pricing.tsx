@@ -133,13 +133,13 @@ export function Calculator() {
   const [id, setId] = useState("llc_wy");
   const [years, setYears] = useState(2);
   const [tax, setTax] = useState(false);
-  const [mail, setMail] = useState(false);
   const p = products.find((p) => p.id === id)!;
   // Платёж штату впервые наступает на второй год: пошлина за регистрацию уже в цене пакета,
   // годовой отчёт WY — в месяц регистрации следующего года, налог DE — до 1 июня следующего года.
   const state = p.state * (years - 1);
   const renewal = p.renew * (years - 1);
-  const extras = (tax ? 349 * years : 0) + (mail ? 99 * years : 0);
+  // Почтовый адрес и ускоренная регистрация DE убраны из расчёта до подтверждения цен (UI_SPEC_021).
+  const extras = tax ? 349 * years : 0;
   return (
     <section className="calculator" id="calculator">
       <div className="calc-left">
@@ -182,14 +182,6 @@ export function Calculator() {
             ({lang === "ru" ? "для LLC с одним владельцем" : "single-member LLC"})
           </span>
         </label>
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={mail}
-            onChange={(e) => setMail(e.target.checked)}
-          />
-          {t.addNames[1]} · {t.from} $99/{t.year}
-        </label>
       </div>
       <div className="calc-result">
         <span className="eyebrow">
@@ -212,14 +204,24 @@ export function Calculator() {
         ))}
         <p className="fineprint">
           <Info size={15} />
-          {t.calcNote}
+          {t.calcNote}{" "}
+          {lang === "ru"
+            ? "Расчёт ориентировочный. Итоговая стоимость подтверждается перед оплатой."
+            : "The calculation is an estimate. The final price is confirmed before payment."}
         </p>
+        {/* Срок переносится в мастер как предвыбор; ничего не покупается. */}
+        <Button asChild>
+          <Link to={`/app/start?years=${years}`}>
+            {lang === "ru" ? "Оформить с этим сроком" : "Start with this term"}
+            <ArrowRight size={16} />
+          </Link>
+        </Button>
       </div>
     </section>
   );
 }
 export function Pricing() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   return (
     <div className="container page">
       <div className="page-heading">
@@ -231,11 +233,14 @@ export function Pricing() {
       <section className="section">
         <h2>{t.addons}</h2>
         <div className="addons">
-          {t.addNames.map((n, i) => (
+          {(lang === "ru"
+            ? [["Form 5472 + pro-forma 1120", "$349 в год · по запросу"], ["Почтовый адрес в США", "по запросу"], ["Ускоренная регистрация Delaware", "по запросу"]]
+            : [["Form 5472 + pro-forma 1120", "$349 per year · on request"], ["US mailing address", "on request"], ["Expedited Delaware filing", "on request"]]
+          ).map(([n, price]) => (
             <div key={n}>
               <Plus size={20} />
               <span>{n}</span>
-              <b>{["$349/" + t.year, t.from + " $99/" + t.year, "+$75"][i]}</b>
+              <b>{price}</b>
             </div>
           ))}
         </div>
