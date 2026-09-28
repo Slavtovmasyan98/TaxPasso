@@ -27,7 +27,7 @@ export function LLC() {
             {t.separate}: {t.from} $60/{t.year}
           </p>
           <Button asChild>
-            <Link to="/app/new?product=llc_wy">
+            <Link to="/app/start?product=llc_wy">
               {t.open}
               <ArrowRight size={18} />
             </Link>
@@ -44,7 +44,7 @@ export function LLC() {
             {t.separate}: $400/{t.year}
           </p>
           <Button asChild variant="outline">
-            <Link to="/app/new?product=llc_de">
+            <Link to="/app/start?product=llc_de">
               {t.open}
               <ArrowRight size={18} />
             </Link>
@@ -170,7 +170,7 @@ export function ITINQuiz() {
   function restart() { setOutcome(null); setStep(0); setSsn(""); setBasis(""); }
   // Ссылка в анкету с ответами опросника
   const applyLink = (product: string, basisCode = BASIS_CODES[Number(basis)] || "") =>
-    `/app/new?product=${product}&quiz_ssn=${SSN_CODES[Number(ssn)] || ""}&quiz_basis=${basisCode}`;
+    `${product.startsWith("bundle") ? "/app/start" : "/app/new"}?product=${product}&quiz_ssn=${SSN_CODES[Number(ssn)] || ""}&quiz_basis=${basisCode}`;
 
   // Консультация специалиста (016–017): вместо заказа ITIN создаётся заказ itin_consult.
   const consultLink = () =>
@@ -224,7 +224,7 @@ export function ITINQuiz() {
                   "The IRS does not accept an ITIN application if you have an SSN or are eligible for one. If you are eligible but have not received it yet, apply for an SSN with the Social Security Administration. You can form a company and get an EIN with an SSN, without an ITIN.")}</p>
             <div className="button-row">
               <Button variant="outline" onClick={restart}>{t.back}</Button>
-              <Button asChild><Link to={`/app/new?product=${llcProduct}`}>{T("Открыть LLC + EIN", "Form an LLC + EIN")}</Link></Button>
+              <Button asChild><Link to={`/app/start?product=${llcProduct}`}>{T("Открыть LLC + EIN", "Form an LLC + EIN")}</Link></Button>
             </div>
           </>
         ) : outcome.kind === "no_basis" ? (
@@ -238,7 +238,7 @@ export function ITINQuiz() {
                 <p className="muted">{consultNote}</p>
                 <div className="button-row">
                   <Button variant="outline" onClick={restart}>{t.back}</Button>
-                  <Button variant="outline" asChild><Link to={`/app/new?product=${llcProduct}`}>{T("Открыть LLC + EIN", "Form an LLC + EIN")}</Link></Button>
+                  <Button variant="outline" asChild><Link to={`/app/start?product=${llcProduct}`}>{T("Открыть LLC + EIN", "Form an LLC + EIN")}</Link></Button>
                   <Button asChild><Link to={consultLink()}>{T("Проверить у специалиста", "Ask a specialist to check")}<ArrowRight size={17} /></Link></Button>
                 </div>
               </>
@@ -246,7 +246,7 @@ export function ITINQuiz() {
               <div className="button-row">
                 <Button variant="outline" onClick={restart}>{t.back}</Button>
                 <Button variant="outline" asChild><Link to={applyLink(fromBundle ? requested! : "itin_standard", "none")}>{T("Проверить у специалиста", "Ask a specialist to check")}</Link></Button>
-                <Button asChild><Link to={`/app/new?product=${llcProduct}`}>{T("Открыть LLC + EIN", "Form an LLC + EIN")}</Link></Button>
+                <Button asChild><Link to={`/app/start?product=${llcProduct}`}>{T("Открыть LLC + EIN", "Form an LLC + EIN")}</Link></Button>
               </div>
             )}
           </>
@@ -260,7 +260,7 @@ export function ITINQuiz() {
             <div className="button-row">
               <Button variant="outline" onClick={restart}>{t.back}</Button>
               {fromBundle && (
-                <Button variant="outline" asChild><Link to={`/app/new?product=${llcProduct}`}>{T("Открыть LLC + EIN без ITIN", "Form an LLC + EIN without an ITIN")}</Link></Button>
+                <Button variant="outline" asChild><Link to={`/app/start?product=${llcProduct}`}>{T("Открыть LLC + EIN без ITIN", "Form an LLC + EIN without an ITIN")}</Link></Button>
               )}
               <Button asChild><Link to={consultLink()}>{T("Проверить у специалиста", "Ask a specialist to check")}<ArrowRight size={17} /></Link></Button>
             </div>

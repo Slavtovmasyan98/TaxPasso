@@ -103,7 +103,7 @@ export function Home() {
             <p className="hero-sub">{t.sub}</p>
             <div className="hero-buttons">
               <Button asChild>
-                <Link to="/app/new?product=llc_wy">
+                <Link to="/app/start?product=llc_wy">
                   {t.open}
                   <ArrowUpRight size={19} />
                 </Link>
