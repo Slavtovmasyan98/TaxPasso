@@ -5,11 +5,11 @@ from prod_migrations import BASE, LEGACY, NEW, classify, validate_connection
 class ProductionGuards(unittest.TestCase):
     def test_known_histories(self):
         self.assertEqual(classify(LEGACY), "legacy")
-        for n in range(6):
+        for n in range(len(NEW) + 1):
             self.assertEqual(classify(BASE + NEW[:n]), "normalized")
 
     def test_unknown_or_partial_history_stops(self):
-        for versions in [[], LEGACY[:-1], BASE[:-1], BASE + ["012"], BASE + ["016"], BASE + ["001"], LEGACY + BASE]:
+        for versions in [[], LEGACY[:-1], BASE[:-1], BASE + ["012"], BASE + ["016"], BASE + NEW[:5] + ["017"], BASE + NEW + ["019"], BASE + ["001"], LEGACY + BASE]:
             with self.subTest(versions=versions), self.assertRaises(SystemExit):
                 classify(versions)
 
