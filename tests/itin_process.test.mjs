@@ -4,6 +4,7 @@
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
+import { submitItinApplication } from "./helpers/itin.mjs";
 
 const URL = process.env.SUPABASE_URL;
 const ANON = process.env.SUPABASE_ANON_KEY;
@@ -147,6 +148,8 @@ test("ITIN + декларация: этапы, отказ IRS → повторн
   assert.equal((await adm.c.rpc("confirm_eligibility", { p_order: o, p_op: op() })).error, null);
   assert.equal(await rpc(adm, "mark_order_paid_manually", { p_order: o, p_note: "qa" }), null);
 
+  assert.match(err(await propose(both, o, "return_prep")) ?? "", /ITIN application required/, "без анкеты W-7 работа не начинается (024)");
+  assert.equal(await submitItinApplication(client, o), "ok");
   assert.match(err(await propose(both, o, "caa_interview")) ?? "", /Status changed/, "сначала подготовка декларации");
   for (const to of ["return_prep", "client_signed", "caa_interview", "sent_irs"]) await step(o, to);
 

@@ -113,7 +113,7 @@ test("админ может переопределить специалиста 
   assert.ok(row.closed_at);
 });
 
-test("после одобрения: специалист виден до переназначения, теряет доступ после CAA/CPA", { skip }, async () => {
+test("после одобрения специалист снят с заказа (023), заказ получает CAA/CPA", { skip }, async () => {
   const o = await newConsultOrder();
   assert.equal(err(await adm.c.rpc("assign_partner", { p_order: o, p_partner: specialistId })), null);
   assert.equal(err(await specialist.c.rpc("propose_specialist_plan", {
@@ -121,11 +121,12 @@ test("после одобрения: специалист виден до пер
   })), null);
   assert.equal((await adm.c.rpc("confirm_specialist_plan", { p_order: o, p_op: op() })).data, "ok");
 
-  assert.ok((await specialist.c.rpc("partner_orders")).data.find((r) => r.id === o), "специалист ещё видит заказ");
+  assert.equal((await svc.from("orders").select("partner_id").eq("id", o).single()).data.partner_id, null, "специалист снят при одобрении");
+  assert.ok(!(await specialist.c.rpc("partner_orders")).data.find((r) => r.id === o), "специалист сразу теряет доступ");
   assert.match(err(await adm.c.rpc("assign_partner", { p_order: o, p_partner: caaOnlyId })) ?? "", /CAA\/CPA/, "itin_return требует именно CAA/CPA");
   assert.equal(err(await adm.c.rpc("assign_partner", { p_order: o, p_partner: dualId })), null);
 
-  assert.ok(!(await specialist.c.rpc("partner_orders")).data.find((r) => r.id === o), "специалист теряет доступ после переназначения");
+  assert.ok(!(await specialist.c.rpc("partner_orders")).data.find((r) => r.id === o), "специалист не видит заказ и после назначения CAA/CPA");
   assert.ok((await dual.c.rpc("partner_orders")).data.find((r) => r.id === o), "новый CAA/CPA видит заказ");
 });
 
