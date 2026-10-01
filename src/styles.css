@@ -166,6 +166,9 @@ input[type="radio"] {
 .nav a.active {
   color: var(--accent);
 }
+.nav-account {
+  display: none;
+}
 .header-actions {
   display: flex;
   gap: 16px;
@@ -1376,6 +1379,9 @@ a:hover {
   .account-link {
     display: none;
   }
+  .nav-account {
+    display: inline;
+  }
   .hero {
     gap: 30px;
   }
@@ -1429,6 +1435,14 @@ a:hover {
     border-bottom: 1px solid var(--line);
     justify-content: space-around;
     flex-wrap: wrap;
+  }
+  .nav.open .nav-account {
+    display: block;
+    width: 100%;
+    text-align: center;
+    margin-top: 6px;
+    padding-top: 14px;
+    border-top: 1px solid var(--line);
   }
   .header-actions {
     gap: 10px;

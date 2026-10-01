@@ -47,6 +47,9 @@ export function Layout() {
             <NavLink to="/pricing">{t.nav[1]}</NavLink>
             <Link to="/#how">{t.nav[2]}</Link>
             <NavLink to="/faq">{t.nav[3]}</NavLink>
+            <Link to="/app" className="nav-account">
+              {t.login}
+            </Link>
           </nav>
           <div className="header-actions">
             <button
