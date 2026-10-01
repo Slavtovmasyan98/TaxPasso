@@ -9,7 +9,7 @@ class ProductionGuards(unittest.TestCase):
             self.assertEqual(classify(BASE + NEW[:n]), "normalized")
 
     def test_unknown_or_partial_history_stops(self):
-        for versions in [[], LEGACY[:-1], BASE[:-1], BASE + ["012"], BASE + ["016"], BASE + NEW[:5] + ["017"], BASE + NEW + ["023"], BASE + ["001"], LEGACY + BASE]:
+        for versions in [[], LEGACY[:-1], BASE[:-1], BASE + ["012"], BASE + ["016"], BASE + NEW[:5] + ["017"], BASE + NEW + ["024"], BASE + ["001"], LEGACY + BASE]:
             with self.subTest(versions=versions), self.assertRaises(SystemExit):
                 classify(versions)
 
