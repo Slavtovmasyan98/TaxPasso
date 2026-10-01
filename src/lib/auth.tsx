@@ -15,7 +15,8 @@ const C = createContext<{
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(!!supabase);
-  const [role, setRole] = useState("client");
+  // Роль из profiles; null — ещё не загружена для текущего пользователя.
+  const [role, setRole] = useState<{ uid: string; role: string } | null>(null);
   useEffect(() => {
     if (!supabase) return;
     let active = true;
@@ -34,18 +35,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data.subscription.unsubscribe();
     };
   }, []);
+  // Запрашиваем роль один раз на пользователя (не при каждом обновлении токена). Пока она не известна,
+  // кабинет показывает «Загрузка», чтобы партнёр не увидел клиентский интерфейс даже на мгновение.
+  const uid = session?.user.id;
   useEffect(() => {
-    setRole("client");
-    if (session && supabase)
-      supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", session.user.id)
-        .single()
-        .then(({ data }) => {
-          if (data) setRole(data.role);
-        });
-  }, [session]);
-  return <C.Provider value={{ session, loading, role }}>{children}</C.Provider>;
+    if (!uid || !supabase) return;
+    let active = true;
+    supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", uid)
+      .single()
+      .then(({ data }) => {
+        // При ошибке — клиент: права всё равно проверяет база (партнёр не может создать заказ).
+        if (active) setRole({ uid, role: data?.role || "client" });
+      });
+    return () => {
+      active = false;
+    };
+  }, [uid]);
+  const roleReady = !uid || role?.uid === uid;
+  return (
+    <C.Provider value={{ session, loading: loading || !roleReady, role: (roleReady && role?.role) || "client" }}>
+      {children}
+    </C.Provider>
+  );
 }
 export const useAuth = () => useContext(C);

@@ -115,8 +115,8 @@ export function AppLayout() {
           <h2>{lang === "ru" ? "Это партнёрский аккаунт" : "This is a partner account"}</h2>
           <p className="muted">
             {lang === "ru"
-              ? "Партнёры CAA/CPA работают в отдельном кабинете Taxpasso Partners."
-              : "CAA/CPA partners work in the separate Taxpasso Partners workspace."}
+              ? "Клиентский кабинет недоступен для партнёров CAA/CPA и специалистов. Ваши заказы и консультации — в отдельном кабинете Taxpasso Partners."
+              : "The client area is not available to CAA/CPA partners and specialists. Your orders and consultations are in the separate Taxpasso Partners workspace."}
           </p>
           <div className="button-row">
             <Button asChild>
