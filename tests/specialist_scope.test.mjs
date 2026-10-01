@@ -3,6 +3,7 @@
 import { test, before } from "node:test";
 import assert from "node:assert/strict";
 import { createClient } from "@supabase/supabase-js";
+import { submitItinApplication } from "./helpers/itin.mjs";
 
 const URL = process.env.SUPABASE_URL, ANON = process.env.SUPABASE_ANON_KEY, SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const skip = !URL || !ANON || !SERVICE ? "нет ключей тестовой базы" : false;
@@ -102,5 +103,6 @@ test("специалист, назначенный на обычный зака�
   // тот же заказ у CAA/CPA работает
   assert.equal(err(await svc.from("orders").update({ partner_id: caaId }).eq("id", o)), null);
   assert.equal(await readsDocs(caa, o), true);
+  assert.equal(await submitItinApplication(client, o), "ok");
   assert.equal(err(await caa.c.rpc("propose_status", { p_order: o, p_stream: "main", p_to: "caa_interview", p_op: op() })), null);
 });

@@ -18,6 +18,7 @@ import {
   LogOut,
   Clock3,
   LockKeyhole,
+  CircleCheck,
 } from "lucide-react";
 import { useI18n } from "../i18n";
 import { useAuth } from "../lib/auth";
@@ -196,6 +197,8 @@ export function OrderTracker({ order }: { order: Order }) {
     : t.llcStatuses;
   const current = codes.indexOf(order.status);
   const [itinInfo, setItinInfo] = useState<{ itin: string; assigned_on: string | null } | null>(null);
+  // Анкета ITIN (W-7, миграция 024): null — ещё не начата.
+  const [w7, setW7] = useState<{ status: string; returned_note: string | null; submitted_at: string | null } | null>(null);
   const [irsEvents, setIrsEvents] = useState<{ id: string; kind: string; note: string; attempt: number; created_at: string }[]>([]);
   const [rejectedDocs, setRejectedDocs] = useState<{ id: string; name: string; review_comment: string | null }[]>([]);
   useEffect(() => {
@@ -206,10 +209,12 @@ export function OrderTracker({ order }: { order: Order }) {
       Promise.all([
         supabase!.from("order_itin").select("itin,assigned_on").eq("order_id", order.id).maybeSingle(),
         supabase!.from("itin_irs_events").select("id,kind,note,attempt,created_at").eq("order_id", order.id).order("created_at", { ascending: false }),
-      ]).then(([itin, events]) => {
+        supabase!.from("itin_applications").select("status,returned_note,submitted_at").eq("order_id", order.id).maybeSingle(),
+      ]).then(([itin, events, app]) => {
         if (!active) return;
         if (!itin.error) setItinInfo(itin.data || null);
         if (!events.error) setIrsEvents(events.data || []);
+        if (!app.error) setW7(app.data || null);
       });
     };
     load();
@@ -268,6 +273,22 @@ export function OrderTracker({ order }: { order: Order }) {
       <div className="button-row"><span className={"badge " + (order.payment_status === "paid" ? "success" : "neutral")}>{paymentLabel}</span>{order.payment_marked_manually && <span className="fineprint">{lang === "ru" ? "Оплата отмечена вручную" : "Payment marked manually"}</span>}</div>
       {order.eligibility === "rejected" && <p className="notice" role="alert">{lang === "ru" ? "ITIN отклонён" : "ITIN rejected"}{order.eligibility_note ? ": " + order.eligibility_note : ""}</p>}
       {order.eligibility === "pending" && isItin && <p className="notice">{order.product.startsWith("bundle") ? (lang === "ru" ? "Пакет оплачивается сразу. Если основание ITIN не подтвердится, вернём $100; LLC и EIN продолжим оформлять." : "The bundle is paid upfront. If the ITIN basis is not confirmed, we refund $100 and continue the LLC and EIN work.") : (lang === "ru" ? "Основание ITIN проверяет специалист. Оплата — после подтверждения." : "A specialist is reviewing your ITIN eligibility. Payment is due after approval.")}</p>}
+      {showItinDetails && order.eligibility === "approved" && !order.cancelled_at && !order.closed_at && (
+        w7?.status === "submitted"
+          ? <p className="notice"><CircleCheck size={18} />{lang === "ru" ? "Анкета ITIN (W-7) отправлена. " : "ITIN application (W-7) submitted. "}<Link to={"/app/itin/" + order.id}>{lang === "ru" ? "Посмотреть" : "View"}</Link></p>
+          : <Link className="rejected-document-alert" to={"/app/itin/" + order.id} role={w7?.status === "returned" ? "alert" : undefined}>
+              <span className="rejected-document-dot" aria-hidden="true" />
+              <span>
+                <b>{w7?.status === "returned"
+                  ? (lang === "ru" ? "Анкета ITIN возвращена на исправление" : "ITIN application returned for correction")
+                  : w7 ? (lang === "ru" ? "Продолжите анкету ITIN (W-7)" : "Continue your ITIN application (W-7)")
+                  : (lang === "ru" ? "Заполните анкету ITIN (W-7)" : "Fill in your ITIN application (W-7)")}</b>
+                <small>{w7?.status === "returned" && w7.returned_note ? w7.returned_note
+                  : (lang === "ru" ? "Основание подтверждено. Без анкеты специалист CAA не сможет начать работу." : "Your eligibility is confirmed. The CAA can't start without the application.")}</small>
+              </span>
+              <ArrowUpRight size={18} aria-hidden="true" />
+            </Link>
+      )}
       {(order.itin_attempt || 1)>1 && <p className="notice">{lang==="ru" ? `Повторная подача, попытка ${order.itin_attempt} (бесплатно)` : `Resubmission, attempt ${order.itin_attempt} (free)`}</p>}
       {itinInfo && <p className="notice">{lang === "ru" ? "Ваш ITIN: " : "Your ITIN: "}<b>{itinInfo.itin}</b>{itinInfo.assigned_on && <span> · {lang === "ru" ? "присвоен" : "assigned"} {new Date(itinInfo.assigned_on + "T12:00:00").toLocaleDateString(lang === "ru" ? "ru-RU" : "en-US")}</span>}</p>}
       {irsEvents.map(event => <p className="notice" key={event.id}>

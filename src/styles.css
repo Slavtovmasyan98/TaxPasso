@@ -1838,3 +1838,21 @@ select[aria-invalid="true"] {
     align-items: stretch;
   }
 }
+/* Анкета ITIN (W-7): сводка — подпись и значение, длинные значения переносятся. */
+.w7-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 38%) 1fr;
+  gap: 4px 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.w7-row strong {
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 560px) {
+  .w7-row {
+    grid-template-columns: 1fr;
+  }
+}
