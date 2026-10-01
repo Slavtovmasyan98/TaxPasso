@@ -19,6 +19,7 @@ import { AppLayout, Dashboard, Documents, Deadlines } from "./pages/Dashboard";
 import { Onboarding } from "./pages/Onboarding";
 import { LlcOnboarding } from "./pages/LlcOnboarding";
 import { ConsultOnboarding } from "./pages/Consult";
+import { ItinApplication } from "./pages/ItinApplication";
 import { CONFIG_ERROR } from "./lib/config";
 function NotFound() {
   const { t } = useI18n();
@@ -73,6 +74,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
                 <Route path="new" element={<Onboarding />} />
                 <Route path="start" element={<LlcOnboarding />} />
                 <Route path="consult" element={<ConsultOnboarding />} />
+                <Route path="itin/:orderId" element={<ItinApplication />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Route>
