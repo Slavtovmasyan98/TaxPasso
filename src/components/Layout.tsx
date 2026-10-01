@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { ArrowUpRight, Menu, X, Moon, Sun } from "lucide-react";
 import { useI18n } from "../i18n";
+import { useAuth } from "../lib/auth";
 import { Button } from "./ui/button";
 export function Logo() {
   return (
@@ -20,6 +21,7 @@ export function Logo() {
 }
 export function Layout() {
   const { t, lang, setLang } = useI18n();
+  const { session, loading } = useAuth();
   const [open, setOpen] = useState(false);
   const [dark, setDark] = useState(
     localStorage.getItem("taxpasso-theme") === "dark",
@@ -47,6 +49,24 @@ export function Layout() {
             <NavLink to="/pricing">{t.nav[1]}</NavLink>
             <Link to="/#how">{t.nav[2]}</Link>
             <NavLink to="/faq">{t.nav[3]}</NavLink>
+            <div className="nav-auth">
+              {!loading &&
+                (session ? (
+                  <Link to="/app" className="nav-account">
+                    {t.login}
+                    <ArrowUpRight size={16} />
+                  </Link>
+                ) : (
+                  <>
+                    <Link to="/login" className="nav-sign-in">
+                      {t.signIn}
+                    </Link>
+                    <Link to="/login?mode=signup" className="nav-sign-up">
+                      {t.signUp}
+                    </Link>
+                  </>
+                ))}
+            </div>
           </nav>
           <div className="header-actions">
             <button
@@ -62,17 +82,31 @@ export function Layout() {
             >
               {dark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="account-link"
-            >
-              <Link to="/app">
-                {t.login}
-                <ArrowUpRight size={16} />
-              </Link>
-            </Button>
+            <div className="account-actions">
+              {!loading &&
+                (session ? (
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="account-link"
+                  >
+                    <Link to="/app">
+                      {t.login}
+                      <ArrowUpRight size={16} />
+                    </Link>
+                  </Button>
+                ) : (
+                  <>
+                    <Link to="/login" className="header-sign-in">
+                      {t.signIn}
+                    </Link>
+                    <Link to="/login?mode=signup" className="header-sign-up">
+                      {t.signUp}
+                    </Link>
+                  </>
+                ))}
+            </div>
             <button
               className="icon-button menu-toggle"
               aria-label="Menu"
