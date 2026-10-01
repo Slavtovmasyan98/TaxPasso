@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, LockKeyhole } from "lucide-react";
 import { supabase } from "../lib/supabase";
@@ -24,13 +24,18 @@ function authMessage(
 
 export function Login() {
   const { t } = useI18n();
+  const [params] = useSearchParams();
+  const requestedMode = params.get("mode") === "signup";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [signup, setSignup] = useState(false);
+  const [signup, setSignup] = useState(requestedMode);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
-  const [params] = useSearchParams();
+  useEffect(() => {
+    setSignup(requestedMode);
+    setMessage("");
+  }, [requestedMode]);
   const requested = params.get("next") || "/app";
   const target = new URL(requested.startsWith("/app") ? requested : "/app", location.origin);
   const destination = target.origin === location.origin && (target.pathname === "/app" || target.pathname.startsWith("/app/"))
