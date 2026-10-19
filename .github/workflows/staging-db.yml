@@ -44,3 +44,13 @@ jobs:
         env:
           DB_URL: ${{ secrets.STAGING_DB_URL }}
         run: supabase db push --db-url "$DB_URL" --yes
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify migration 025 delete-audit triggers (read-only)
+        env:
+          STAGING_DB_URL: ${{ secrets.STAGING_DB_URL }}
+          PGSSLMODE: require
+          PGCONNECT_TIMEOUT: '15'
+        run: node --test tests/delete_audit.test.mjs

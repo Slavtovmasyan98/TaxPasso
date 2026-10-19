@@ -19,6 +19,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Production release guard tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
   database:
     runs-on: ubuntu-latest
@@ -45,3 +47,8 @@ jobs:
           SUPABASE_URL: ${{ env.LOCAL_API_URL }}
           SUPABASE_ANON_KEY: ${{ env.LOCAL_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
+
+      - name: Verify migration 025 triggers on clean local database
+        run: node --test tests/delete_audit.test.mjs
+        env:
+          STAGING_DB_URL: ${{ env.LOCAL_DB_URL }}
