@@ -1,5 +1,5 @@
 import unittest
-from prod_migrations import BASE, LEGACY, NEW, classify, validate_connection
+from prod_migrations import BASE, LEGACY, NEW, classify, validate_connection, pending_for_release, APPLIED
 
 
 class ProductionGuards(unittest.TestCase):
@@ -9,9 +9,18 @@ class ProductionGuards(unittest.TestCase):
             self.assertEqual(classify(BASE + NEW[:n]), "normalized")
 
     def test_unknown_or_partial_history_stops(self):
-        for versions in [[], LEGACY[:-1], BASE[:-1], BASE + ["012"], BASE + ["016"], BASE + NEW[:5] + ["017"], BASE + NEW + ["025"], BASE + ["001"], LEGACY + BASE]:
+        for versions in [[], LEGACY[:-1], BASE[:-1], BASE + ["012"], BASE + ["016"], BASE + NEW[:5] + ["017"], BASE + NEW + ["026"], BASE + ["001"], LEGACY + BASE]:
             with self.subTest(versions=versions), self.assertRaises(SystemExit):
                 classify(versions)
+
+    def test_release_025_only(self):
+        self.assertEqual(NEW[-1], "025")
+        self.assertEqual(APPLIED, [f"{i:03}" for i in range(1, 25)])
+        self.assertEqual(pending_for_release(APPLIED), ["025"])
+        self.assertEqual(pending_for_release(APPLIED + ["025"]), [])
+        for versions in [BASE, APPLIED[:-1], APPLIED + ["026"]]:
+            with self.subTest(versions=versions), self.assertRaises(SystemExit):
+                pending_for_release(versions)
 
     def test_production_connection(self):
         validate_connection("postgresql://postgres:test@db.mhjxjxteorjwkvqbznfl.supabase.co:5432/postgres")
@@ -31,3 +40,4 @@ class ProductionGuards(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

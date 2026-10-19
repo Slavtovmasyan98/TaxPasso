@@ -1,4 +1,4 @@
-"""Guards for production migration rollouts (001–024). No database writes here."""
+"""Guards for production migration rollouts (001–025). No database writes here."""
 import os
 import re
 import subprocess
@@ -8,9 +8,9 @@ from urllib.parse import unquote, urlsplit
 
 LEGACY = "20260924234059 20260924234142 20260924234152 20260924234214 20260925050905 20260925053603 20260926000827 20260926011259 20260926013300 20260926015111".split()
 BASE = [f"{i:03}" for i in range(1, 11)]
-NEW = [f"{i:03}" for i in range(11, 25)]
-# Already applied through 022; preserve these files byte for byte.
-APPLIED = BASE + NEW[:12]
+NEW = [f"{i:03}" for i in range(11, 26)]
+# Preserve all pre-025 migrations byte for byte.
+APPLIED = BASE + NEW[:-1]
 
 
 def require(condition, message):
@@ -41,6 +41,13 @@ def classify(versions):
     raise SystemExit("Unexpected or partially repaired migration history: stop and reconcile the journal.")
 
 
+def pending_for_release(versions):
+    require(classify(versions) == "normalized", "Migration history has not been normalized.")
+    pending = [v for v in NEW if v not in versions]
+    require(pending in (["025"], []), "Release 025 requires 001–024 already applied; stop.")
+    return pending
+
+
 def read_versions():
     result = subprocess.run([
         "psql", os.environ["DB_URL"], "-X", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-c",
@@ -63,7 +70,7 @@ def main():
         require(not repair or dry, "Repair history in a separate dry-run-only dispatch first.")
         source = Path("migration-source/supabase/migrations")
         files = sorted(source.glob("*.sql"))
-        require([f.name.split("_", 1)[0] for f in files] == BASE + NEW, "Release must contain exactly migrations 001–024.")
+        require([f.name.split("_", 1)[0] for f in files] == BASE + NEW, "Release must contain exactly migrations 001–025.")
         for f in files[:len(APPLIED)]:
             baseline = Path("supabase/migrations") / f.name
             require(baseline.exists() and baseline.read_bytes() == f.read_bytes(), f"Baseline migration differs: {f.name}")
@@ -79,11 +86,12 @@ def main():
             f.write(f"needs_repair={'true' if state == 'legacy' else 'false'}\n")
         return
     require(state == "normalized", "Migration history has not been normalized.")
-    pending = [v for v in NEW if v not in versions]
+    pending = pending_for_release(versions)
     if mode == "after":
-        require(not pending, "Not all migrations 011–024 were applied.")
+        require(not pending, "Not all migrations 011–025 were applied.")
     print("Pending migration versions:", ", ".join(pending) or "none")
 
 
 if __name__ == "__main__":
     main()
+
