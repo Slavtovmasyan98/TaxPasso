@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   ArrowUpRight,
-  Check,
   ShieldCheck,
   FileCheck2,
   Globe2,
@@ -76,7 +75,7 @@ export function CTA() {
         <p>{t.ctaSub}</p>
       </div>
       <Button asChild>
-        <Link to="/app/new">
+        <Link to="/app/start">
           {t.start}
           <ArrowUpRight size={20} />
         </Link>
@@ -205,98 +204,6 @@ export function Home() {
               <ArrowRight size={18} />
             </Link>
           </div>
-        </section>
-        <section className="section">
-          <div className="section-header">
-            <div>
-              <span className="eyebrow">TAXPASSO & OTHERS</span>
-              <h2>{t.compare}</h2>
-            </div>
-            <p>{t.compareSub}</p>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>{t.provider}</th>
-                  <th>{t.initial}</th>
-                  <th>{t.renew}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="our-row">
-                  <td>
-                    <b>Taxpasso</b> <Check size={15} />
-                  </td>
-                  <td>$349 · WY / $449 · DE</td>
-                  <td>
-                    $149 / $199 +{" "}
-                    {lang === "ru" ? "платежи штату" : "state obligations"}
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <a
-                      href="https://www.doola.com/pricing/"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Doola ↗
-                    </a>
-                  </td>
-                  <td>
-                    {lang === "ru"
-                      ? "По тарифу провайдера"
-                      : "Provider pricing"}
-                  </td>
-                  <td>
-                    {lang === "ru"
-                      ? "Подписка; проверьте пошлины и состав"
-                      : "Subscription; check state fees and scope"}
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <a
-                      href="https://www.firstbase.io/pricing"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Firstbase ↗
-                    </a>
-                  </td>
-                  <td>
-                    {lang === "ru"
-                      ? "По тарифу провайдера"
-                      : "Provider pricing"}
-                  </td>
-                  <td>
-                    {lang === "ru"
-                      ? "Проверьте RA и дополнительные подписки"
-                      : "Check RA and additional subscriptions"}
-                  </td>
-                </tr>
-                <tr>
-                  <td>
-                    <a
-                      href="https://stripe.com/atlas"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Stripe Atlas ↗
-                    </a>
-                  </td>
-                  <td>$500</td>
-                  <td>
-                    {lang === "ru"
-                      ? "Delaware; продления и налоги отдельно"
-                      : "Delaware; renewals and taxes separate"}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <p className="fineprint">{t.comparisonNote}</p>
         </section>
         <section className="section review-section">
           <span className="eyebrow">
