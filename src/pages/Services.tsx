@@ -332,19 +332,4 @@ export function FAQ() {
     </div>
   );
 }
-export function Legal({ kind }: { kind: "terms" | "privacy" | "refund" }) {
-  const { t } = useI18n();
-  const index = { terms: 0, privacy: 1, refund: 2 }[kind];
-  return (
-    <div className="container page legal-page">
-      <span className="eyebrow">TAXPASSO / LEGAL</span>
-      <h1>{t.legal[index]}</h1>
-      <p className="notice">
-        <Info />
-        {t.legalDraft}
-      </p>
-      <p>{[t.termsBody, t.privacyBody, t.refundBody][index]}</p>
-      <p className="muted">{t.footer}</p>
-    </div>
-  );
-}
+export { LegalDraft as Legal } from "./LegalDraft";
