@@ -48,3 +48,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ env.LOCAL_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ env.LOCAL_SERVICE_ROLE_KEY }}
 
+      - name: Verify migration 025 triggers on clean local database
+        run: node --test tests/delete_audit.test.mjs
+        env:
+          STAGING_DB_URL: ${{ env.LOCAL_DB_URL }}
