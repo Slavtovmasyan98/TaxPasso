@@ -132,14 +132,13 @@ export function Calculator() {
   const { t, lang } = useI18n();
   const [id, setId] = useState("llc_wy");
   const [years, setYears] = useState(2);
-  const [tax, setTax] = useState(false);
   const p = products.find((p) => p.id === id)!;
   // Платёж штату впервые наступает на второй год: пошлина за регистрацию уже в цене пакета,
   // годовой отчёт WY — в месяц регистрации следующего года, налог DE — до 1 июня следующего года.
   const state = p.state * (years - 1);
   const renewal = p.renew * (years - 1);
-  // Почтовый адрес и ускоренная регистрация DE убраны из расчёта до подтверждения цен (UI_SPEC_021).
-  const extras = tax ? 349 * years : 0;
+  // Доп. услуги (адрес, ускоренная регистрация DE, Form 5472) убраны из расчёта: в базе они
+  // выключены и цена не подтверждена (price_confirmed=false), поэтому калькулятор их не считает.
   return (
     <section className="calculator" id="calculator">
       <div className="calc-left">
@@ -171,31 +170,24 @@ export function Calculator() {
             </button>
           ))}
         </div>
-        <label className="checkbox">
-          <input
-            type="checkbox"
-            checked={tax}
-            onChange={(e) => setTax(e.target.checked)}
-          />
-          Form 5472 + 1120 · $349/{t.year}{" "}
-          <span className="muted">
-            ({lang === "ru" ? "для LLC с одним владельцем" : "single-member LLC"})
-          </span>
-        </label>
+        <p className="muted">
+          {lang === "ru"
+            ? "Дополнительные услуги в расчёт не входят: их стоимость подтверждается отдельно."
+            : "Additional services are not included: their price is confirmed separately."}
+        </p>
       </div>
       <div className="calc-result">
         <span className="eyebrow">
           {t.total} · {t.years[years - 1]}
         </span>
         <div className="calc-total">
-          ${p.price + renewal + state + extras}
+          ${p.price + renewal + state}
           <small>USD</small>
         </div>
         {[
           [t.formation, p.price],
           [t.serviceRenew, renewal],
           [t.stateTax, state],
-          [t.addons, extras],
         ].map(([k, v]) => (
           <div className="cost-row" key={k}>
             <span>{k}</span>
@@ -234,8 +226,8 @@ export function Pricing() {
         <h2>{t.addons}</h2>
         <div className="addons">
           {(lang === "ru"
-            ? [["Form 5472 + pro-forma 1120", "$349 в год · по запросу"], ["Почтовый адрес в США", "по запросу"], ["Ускоренная регистрация Delaware", "по запросу"]]
-            : [["Form 5472 + pro-forma 1120", "$349 per year · on request"], ["US mailing address", "on request"], ["Expedited Delaware filing", "on request"]]
+            ? [["Form 5472 + pro-forma 1120", "по запросу"], ["Почтовый адрес в США", "по запросу"], ["Ускоренная регистрация Delaware", "по запросу"]]
+            : [["Form 5472 + pro-forma 1120", "on request"], ["US mailing address", "on request"], ["Expedited Delaware filing", "on request"]]
           ).map(([n, price]) => (
             <div key={n}>
               <Plus size={20} />
